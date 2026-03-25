@@ -1,5 +1,6 @@
 create table if not exists public.kayou_cards (
   id uuid primary key default gen_random_uuid(),
+  owner_name text,
   title text not null,
   character text not null,
   set_name text not null,
@@ -15,6 +16,9 @@ create table if not exists public.kayou_cards (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.kayou_cards
+  add column if not exists owner_name text;
 
 create index if not exists kayou_cards_created_at_idx
   on public.kayou_cards (created_at desc);

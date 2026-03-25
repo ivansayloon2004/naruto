@@ -4,6 +4,7 @@ const SUPABASE_TABLE = "kayou_cards";
 const SAMPLE_CARDS = [
   {
     id: crypto.randomUUID(),
+    ownerName: "Archive Owner",
     title: "Six Paths Naruto",
     character: "Naruto Uzumaki",
     set: "Tier 4 Wave 2",
@@ -19,6 +20,7 @@ const SAMPLE_CARDS = [
   },
   {
     id: crypto.randomUUID(),
+    ownerName: "Archive Owner",
     title: "Mangekyo Clash",
     character: "Sasuke Uchiha",
     set: "Tier 3 Wave 5",
@@ -34,6 +36,7 @@ const SAMPLE_CARDS = [
   },
   {
     id: crypto.randomUUID(),
+    ownerName: "Archive Owner",
     title: "Team 7 Reunion",
     character: "Naruto, Sasuke, Sakura",
     set: "English Debut Set",
@@ -60,6 +63,7 @@ const rarityRank = {
 
 const elements = {
   authForm: document.querySelector("#auth-form"),
+  authOwnerName: document.querySelector("#auth-owner-name"),
   authEmail: document.querySelector("#auth-email"),
   authPassword: document.querySelector("#auth-password"),
   authSubmitButton: document.querySelector("#auth-submit-button"),
@@ -75,6 +79,7 @@ const elements = {
   logoutButton: document.querySelector("#logout-button"),
   form: document.querySelector("#card-form"),
   cardId: document.querySelector("#card-id"),
+  ownerName: document.querySelector("#card-owner-name"),
   title: document.querySelector("#card-title"),
   character: document.querySelector("#card-character"),
   set: document.querySelector("#card-set"),
@@ -157,6 +162,7 @@ function bindEventListeners() {
 
 async function initializeApp() {
   elements.authSubmitButton.disabled = !supabase;
+  elements.authOwnerName.value = inferOwnerNameFromEmail("");
   updateOwnerUI();
   render();
 
@@ -226,11 +232,12 @@ async function handleAuthSubmit(event) {
     return;
   }
 
+  const ownerName = elements.authOwnerName.value.trim();
   const email = elements.authEmail.value.trim();
   const password = elements.authPassword.value;
 
-  if (!email || !password) {
-    setAuthFeedback("Enter the owner email and password to continue.", true);
+  if (!ownerName || !email || !password) {
+    setAuthFeedback("Enter the public owner name, owner email, and password to continue.", true);
     return;
   }
 
@@ -247,6 +254,7 @@ async function handleAuthSubmit(event) {
   }
 
   currentOwner = data?.user || data?.session?.user || null;
+  currentOwner.ownerName = ownerName;
   elements.authForm.reset();
   updateOwnerUI();
   setAuthFeedback("Owner access granted. Management tools are now available.");
@@ -283,9 +291,12 @@ function updateOwnerUI() {
   elements.setupBanner.hidden = Boolean(supabase);
   elements.migrateLocalButton.hidden = !ownerActive || !legacyCards.length;
 
+  const publicOwnerName = resolveArchiveOwnerName();
   elements.ownerBadge.textContent = ownerActive
-    ? `Owner session: ${currentOwner.email || "Authenticated owner"}`
-    : "Public archive online";
+    ? `Owner session: ${publicOwnerName || currentOwner.email || "Authenticated owner"}`
+    : publicOwnerName
+      ? `Archive owner: ${publicOwnerName}`
+      : "Public archive online";
 
   elements.authNote.textContent = ownerActive
     ? `Signed in as ${currentOwner.email}. Any changes you save here publish to the shared archive for all visitors.`
@@ -293,6 +304,8 @@ function updateOwnerUI() {
 
   if (!ownerActive) {
     resetForm();
+  } else {
+    syncOwnerNameFields(resolveArchiveOwnerName() || currentOwner.ownerName || inferOwnerNameFromEmail(currentOwner.email));
   }
 
   render();
@@ -333,6 +346,7 @@ async function handleSubmit(event) {
 
   const card = {
     id: elements.cardId.value || crypto.randomUUID(),
+    ownerName: elements.ownerName.value.trim(),
     title: elements.title.value.trim(),
     character: elements.character.value.trim(),
     set: elements.set.value.trim(),
@@ -347,8 +361,8 @@ async function handleSubmit(event) {
     createdAt: elements.cardId.value ? findCreatedAt(elements.cardId.value) : Date.now()
   };
 
-  if (!card.title || !card.character || !card.set) {
-    setAuthFeedback("Complete the title, character, and set fields before saving.", true);
+  if (!card.ownerName || !card.title || !card.character || !card.set) {
+    setAuthFeedback("Complete the owner name, title, character, and set fields before saving.", true);
     return;
   }
 
@@ -425,6 +439,7 @@ async function handleGridClick(event) {
 
 function populateForm(card) {
   elements.cardId.value = card.id;
+  elements.ownerName.value = card.ownerName || "";
   elements.title.value = card.title;
   elements.character.value = card.character;
   elements.set.value = card.set;
@@ -448,6 +463,7 @@ function resetForm() {
   elements.rarity.value = "Common";
   elements.condition.value = "Mint";
   elements.copies.value = 1;
+  syncOwnerNameFields(resolveArchiveOwnerName() || currentOwner?.ownerName || inferOwnerNameFromEmail(currentOwner?.email));
   clearSelectedPhoto();
   elements.saveButton.textContent = "Save card";
 }
@@ -535,6 +551,7 @@ function renderStats(source) {
 
 function renderGrid(source) {
   elements.grid.innerHTML = "";
+  const archiveOwnerName = resolveArchiveOwnerName() || "Archive Owner";
 
   if (!source.length) {
     const emptyState = document.createElement("div");
@@ -564,6 +581,7 @@ function renderGrid(source) {
     fragment.querySelector(".card-character").textContent = card.character;
     fragment.querySelector(".detail-set").textContent = card.set || "Unknown";
     fragment.querySelector(".detail-number").textContent = card.number || "Unlisted";
+    fragment.querySelector(".detail-owner").textContent = card.ownerName || archiveOwnerName;
     fragment.querySelector(".detail-condition").textContent = card.condition || "Unknown";
     fragment.querySelector(".detail-copies").textContent = String(card.copies || 0);
     fragment.querySelector(".detail-date").textContent = formatDate(card.acquisitionDate);
@@ -735,6 +753,7 @@ function loadLegacyCards() {
 function normalizeImportedCard(card) {
   return {
     id: card.id || crypto.randomUUID(),
+    ownerName: String(card.ownerName || card.owner_name || "").trim(),
     title: String(card.title || "").trim(),
     character: String(card.character || "").trim(),
     set: String(card.set || card.set_name || "").trim(),
@@ -753,6 +772,7 @@ function normalizeImportedCard(card) {
 function mapRowToCard(row) {
   return {
     id: row.id,
+    ownerName: row.owner_name || "",
     title: row.title,
     character: row.character,
     set: row.set_name || "",
@@ -771,6 +791,7 @@ function mapRowToCard(row) {
 function toDatabasePayload(card, ownerId) {
   const payload = {
     id: card.id || crypto.randomUUID(),
+    owner_name: card.ownerName || inferOwnerNameFromEmail(currentOwner?.email),
     title: card.title,
     character: card.character,
     set_name: card.set,
@@ -811,6 +832,47 @@ function normalizeLanguage(language) {
 
 function archiveKey(card) {
   return `${card.title}::${normalizeLanguage(card.language)}::${card.number}::${card.set}`;
+}
+
+function resolveArchiveOwnerName() {
+  const ownerNames = cards
+    .map((card) => String(card.ownerName || "").trim())
+    .filter(Boolean);
+
+  if (currentOwner?.ownerName) {
+    ownerNames.unshift(currentOwner.ownerName);
+  }
+
+  if (!ownerNames.length) {
+    return "";
+  }
+
+  const counts = new Map();
+  ownerNames.forEach((name) => {
+    counts.set(name, (counts.get(name) || 0) + 1);
+  });
+
+  return [...counts.entries()].sort((left, right) => right[1] - left[1])[0][0];
+}
+
+function syncOwnerNameFields(name) {
+  const fallbackName = String(name || "").trim();
+  elements.authOwnerName.value = fallbackName;
+  elements.ownerName.value = fallbackName;
+}
+
+function inferOwnerNameFromEmail(email) {
+  const value = String(email || "").trim();
+  if (!value.includes("@")) {
+    return "Archive Owner";
+  }
+
+  const localPart = value.split("@")[0].replace(/[._-]+/g, " ").trim();
+  if (!localPart) {
+    return "Archive Owner";
+  }
+
+  return localPart.replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function languageClass(language) {

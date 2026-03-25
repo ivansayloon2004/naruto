@@ -71,6 +71,11 @@
 
         <form id="auth-form" class="auth-form">
           <label>
+            Public Owner Name
+            <input id="auth-owner-name" name="ownerName" type="text" placeholder="Ivan Sayloon" required>
+          </label>
+
+          <label>
             Owner Email
             <input id="auth-email" name="email" type="email" autocomplete="email" placeholder="owner@example.com" required>
           </label>
@@ -101,6 +106,11 @@
 
           <form id="card-form" class="card-form">
             <input id="card-id" type="hidden">
+
+            <label class="full-width">
+              Public Owner Name
+              <input id="card-owner-name" name="ownerName" type="text" placeholder="Ivan Sayloon" required>
+            </label>
 
             <label>
               Card Title
@@ -274,6 +284,10 @@
           <div>
             <dt>Card No.</dt>
             <dd class="detail-number"></dd>
+          </div>
+          <div>
+            <dt>Owner</dt>
+            <dd class="detail-owner"></dd>
           </div>
           <div>
             <dt>Condition</dt>
