@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Naruto Kayou Card Archive</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Naruto Kayou Collection</p>
+        <h1>Build your own multilingual card vault.</h1>
+        <p class="hero-text">
+          Track every Japanese, Chinese, and English Kayou Naruto card in one place with fast filtering,
+          edit history in the browser, and portable backups.
+        </p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#card-form">Add a card</a>
+          <button class="button button-secondary" id="export-button" type="button">Export JSON</button>
+          <label class="button button-secondary file-button" for="import-file">Import JSON</label>
+          <input id="import-file" type="file" accept=".json,application/json">
+        </div>
+      </div>
+
+      <div class="hero-panel">
+        <div class="panel-label">Collection Pulse</div>
+        <div class="stat-grid">
+          <article class="stat-card">
+            <span class="stat-title">Unique Entries</span>
+            <strong class="stat-value" id="unique-count">0</strong>
+          </article>
+          <article class="stat-card">
+            <span class="stat-title">Total Copies</span>
+            <strong class="stat-value" id="copy-count">0</strong>
+          </article>
+          <article class="stat-card stat-card-language jp">
+            <span class="stat-title">Japanese</span>
+            <strong class="stat-value" id="jp-count">0</strong>
+          </article>
+          <article class="stat-card stat-card-language cn">
+            <span class="stat-title">Chinese</span>
+            <strong class="stat-value" id="cn-count">0</strong>
+          </article>
+          <article class="stat-card stat-card-language en">
+            <span class="stat-title">English</span>
+            <strong class="stat-value" id="en-count">0</strong>
+          </article>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel form-panel">
+        <div class="section-heading">
+          <p class="eyebrow">Card Entry</p>
+          <h2>Add or update a card</h2>
+          <p>Create separate entries when you own the same artwork in different languages.</p>
+        </div>
+
+        <form id="card-form" class="card-form">
+          <input id="card-id" type="hidden">
+
+          <label>
+            Card Title
+            <input id="card-title" name="title" type="text" placeholder="Six Paths Naruto" required>
+          </label>
+
+          <label>
+            Character
+            <input id="card-character" name="character" type="text" placeholder="Naruto Uzumaki" required>
+          </label>
+
+          <label>
+            Set / Series
+            <input id="card-set" name="set" type="text" placeholder="Tier 4 Wave 2" required>
+          </label>
+
+          <label>
+            Card Number
+            <input id="card-number" name="number" type="text" placeholder="MR-001">
+          </label>
+
+          <label>
+            Language Version
+            <select id="card-language" name="language" required>
+              <option value="Japanese">Japanese</option>
+              <option value="Chinese">Chinese</option>
+              <option value="English">English</option>
+            </select>
+          </label>
+
+          <label>
+            Rarity
+            <select id="card-rarity" name="rarity" required>
+              <option value="Common">Common</option>
+              <option value="Rare">Rare</option>
+              <option value="Super Rare">Super Rare</option>
+              <option value="Ultra Rare">Ultra Rare</option>
+              <option value="Secret Rare">Secret Rare</option>
+              <option value="Collector Rare">Collector Rare</option>
+            </select>
+          </label>
+
+          <label>
+            Condition
+            <select id="card-condition" name="condition">
+              <option value="Mint">Mint</option>
+              <option value="Near Mint">Near Mint</option>
+              <option value="Light Play">Light Play</option>
+              <option value="Moderate Play">Moderate Play</option>
+              <option value="Heavy Play">Heavy Play</option>
+            </select>
+          </label>
+
+          <label>
+            Copies Owned
+            <input id="card-copies" name="copies" type="number" min="1" value="1" required>
+          </label>
+
+          <label>
+            Acquisition Date
+            <input id="card-date" name="date" type="date">
+          </label>
+
+          <label>
+            Image URL
+            <input id="card-image" name="image" type="url" placeholder="https://example.com/card.jpg">
+          </label>
+
+          <label class="full-width">
+            Notes
+            <textarea id="card-notes" name="notes" rows="4" placeholder="Binder page, grading plans, trade notes, signed version, etc."></textarea>
+          </label>
+
+          <div class="form-actions full-width">
+            <button class="button button-primary" type="submit" id="save-button">Save card</button>
+            <button class="button button-ghost" type="button" id="reset-button">Clear form</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel collection-panel">
+        <div class="section-heading">
+          <p class="eyebrow">Collection View</p>
+          <h2>Search and filter your archive</h2>
+          <p>Instantly narrow the list by language, rarity, condition, or name.</p>
+        </div>
+
+        <div class="toolbar">
+          <label class="toolbar-item search-field">
+            Search
+            <input id="search-input" type="search" placeholder="Naruto, Sasuke, MR-001, Tier 4...">
+          </label>
+
+          <label class="toolbar-item">
+            Language
+            <select id="filter-language">
+              <option value="All">All</option>
+              <option value="Japanese">Japanese</option>
+              <option value="Chinese">Chinese</option>
+              <option value="English">English</option>
+            </select>
+          </label>
+
+          <label class="toolbar-item">
+            Rarity
+            <select id="filter-rarity">
+              <option value="All">All</option>
+              <option value="Common">Common</option>
+              <option value="Rare">Rare</option>
+              <option value="Super Rare">Super Rare</option>
+              <option value="Ultra Rare">Ultra Rare</option>
+              <option value="Secret Rare">Secret Rare</option>
+              <option value="Collector Rare">Collector Rare</option>
+            </select>
+          </label>
+
+          <label class="toolbar-item">
+            Sort
+            <select id="sort-select">
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="title">Title A-Z</option>
+              <option value="character">Character A-Z</option>
+              <option value="rarity">Highest rarity</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="collection-meta">
+          <span id="results-count">0 cards shown</span>
+          <button class="button button-ghost small" id="load-sample-button" type="button">Add starter sample</button>
+        </div>
+
+        <div id="collection-grid" class="collection-grid" aria-live="polite"></div>
+      </section>
+    </main>
+  </div>
+
+  <template id="card-template">
+    <article class="collection-card">
+      <div class="card-image-wrap">
+        <img class="card-image" alt="">
+        <div class="card-image-fallback">No image</div>
+      </div>
+      <div class="card-body">
+        <div class="card-topline">
+          <span class="language-pill"></span>
+          <span class="rarity-pill"></span>
+        </div>
+        <h3 class="card-title"></h3>
+        <p class="card-character"></p>
+        <dl class="card-details">
+          <div>
+            <dt>Set</dt>
+            <dd class="detail-set"></dd>
+          </div>
+          <div>
+            <dt>Card No.</dt>
+            <dd class="detail-number"></dd>
+          </div>
+          <div>
+            <dt>Condition</dt>
+            <dd class="detail-condition"></dd>
+          </div>
+          <div>
+            <dt>Copies</dt>
+            <dd class="detail-copies"></dd>
+          </div>
+          <div>
+            <dt>Added</dt>
+            <dd class="detail-date"></dd>
+          </div>
+        </dl>
+        <p class="card-notes"></p>
+        <div class="card-actions">
+          <button class="button button-secondary small edit-button" type="button">Edit</button>
+          <button class="button button-ghost small delete-button" type="button">Delete</button>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <script src="script.js"></script>
+</body>
+</html>

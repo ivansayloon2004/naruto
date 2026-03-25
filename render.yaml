@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: naruto-kayou-card-archive
+    runtime: static
+    buildCommand: "true"
+    staticPublishPath: ./
+    envVars:
+      - key: SKIP_INSTALL_DEPS
+        value: "true"
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
