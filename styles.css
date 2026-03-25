@@ -501,6 +501,26 @@ h2 {
   line-height: 1.55;
 }
 
+.owner-session-panel {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1.25rem;
+  padding: 1.1rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(22, 59, 99, 0.06), rgba(22, 59, 99, 0.02));
+}
+
+.owner-session-panel h3 {
+  font-size: 1.35rem;
+}
+
+.owner-session-panel p:not(.eyebrow) {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 .setup-banner,
 .public-note {
   margin-top: 1.25rem;
@@ -867,7 +887,7 @@ h2 {
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(220px, 1.4fr) repeat(3, minmax(145px, 0.8fr));
+  grid-template-columns: minmax(220px, 1.35fr) minmax(190px, 1fr) repeat(3, minmax(145px, 0.78fr));
   gap: 0.9rem;
   margin-top: 1.4rem;
 }

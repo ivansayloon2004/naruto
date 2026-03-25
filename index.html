@@ -79,37 +79,45 @@
           Shared archive setup is incomplete. Add your Supabase project URL and anon key in `supabase-config.js`, then run the SQL in `supabase-setup.sql`.
         </div>
 
-        <div class="public-note" id="public-note">
-          The collection view is public. Management tools appear here only after owner sign-in.
+        <div id="auth-shell">
+          <div class="public-note" id="public-note">
+            The collection view is public. Management tools appear here only after owner sign-in.
+          </div>
+
+          <form id="auth-form" class="auth-form">
+            <label>
+              Public Owner Name
+              <input id="auth-owner-name" name="ownerName" type="text" placeholder="Ivan Sayloon" required>
+            </label>
+
+            <label>
+              Owner Email
+              <input id="auth-email" name="email" type="email" autocomplete="email" placeholder="owner@example.com" required>
+            </label>
+
+            <label>
+              Password
+              <input id="auth-password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+            </label>
+
+            <div class="form-actions full-width">
+              <button class="button button-primary" type="submit" id="auth-submit-button">Sign in as owner</button>
+              <button class="button button-secondary" type="button" id="refresh-button">Refresh shared archive</button>
+              <button class="button button-ghost" type="button" id="migrate-local-button" hidden>Publish local archive</button>
+            </div>
+          </form>
+          <p class="auth-note" id="auth-note">
+            Owner access uses Supabase Auth. Public visitors can still browse the archive without signing in.
+          </p>
         </div>
 
-        <form id="auth-form" class="auth-form">
-          <label>
-            Public Owner Name
-            <input id="auth-owner-name" name="ownerName" type="text" placeholder="Ivan Sayloon" required>
-          </label>
-
-          <label>
-            Owner Email
-            <input id="auth-email" name="email" type="email" autocomplete="email" placeholder="owner@example.com" required>
-          </label>
-
-          <label>
-            Password
-            <input id="auth-password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
-          </label>
-
-          <div class="form-actions full-width">
-            <button class="button button-primary" type="submit" id="auth-submit-button">Sign in as owner</button>
-            <button class="button button-secondary" type="button" id="refresh-button">Refresh shared archive</button>
-            <button class="button button-ghost" type="button" id="migrate-local-button" hidden>Publish local archive</button>
-          </div>
-        </form>
-
         <p class="auth-feedback" id="auth-feedback" role="status" aria-live="polite"></p>
-        <p class="auth-note" id="auth-note">
-          Owner access uses Supabase Auth. Public visitors can still browse the archive without signing in.
-        </p>
+
+        <div class="owner-session-panel" id="owner-session-panel" hidden>
+          <p class="eyebrow">Owner Session</p>
+          <h3>Dashboard unlocked</h3>
+          <p id="owner-session-copy">You are signed in. Collection management tools are active and the login form is hidden.</p>
+        </div>
 
         <div id="manager-shell" hidden>
           <div class="section-heading manager-heading">
@@ -282,7 +290,7 @@
         <div class="section-heading section-heading-secondary">
           <p class="eyebrow">Archive Search</p>
           <h2>Review and filter your records</h2>
-          <p>Switch between owned cards, wishlist targets, and trade records, then search by title, character, set, card number, language, and rarity.</p>
+          <p>Switch between owned cards, wishlist targets, and trade records, then search by owner name, title, character, set, card number, language, and rarity.</p>
         </div>
 
         <div class="status-tabs" id="status-tabs" role="tablist" aria-label="Archive status filters">
@@ -301,7 +309,12 @@
         <div class="toolbar">
           <label class="toolbar-item search-field">
             Search
-            <input id="search-input" type="search" placeholder="Title, character, card number, set...">
+            <input id="search-input" type="search" placeholder="Owner, title, character, card number, set...">
+          </label>
+
+          <label class="toolbar-item">
+            Owner Name
+            <input id="filter-owner" type="search" placeholder="Search collector name">
           </label>
 
           <label class="toolbar-item">

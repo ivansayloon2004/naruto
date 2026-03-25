@@ -77,6 +77,7 @@ const rarityRank = {
 };
 
 const elements = {
+  authShell: document.querySelector("#auth-shell"),
   authForm: document.querySelector("#auth-form"),
   authOwnerName: document.querySelector("#auth-owner-name"),
   authEmail: document.querySelector("#auth-email"),
@@ -86,6 +87,8 @@ const elements = {
   authNote: document.querySelector("#auth-note"),
   setupBanner: document.querySelector("#setup-banner"),
   publicNote: document.querySelector("#public-note"),
+  ownerSessionPanel: document.querySelector("#owner-session-panel"),
+  ownerSessionCopy: document.querySelector("#owner-session-copy"),
   ownerBadge: document.querySelector("#owner-badge"),
   ownerToolbar: document.querySelector("#owner-toolbar"),
   refreshButton: document.querySelector("#refresh-button"),
@@ -123,6 +126,7 @@ const elements = {
   notes: document.querySelector("#card-notes"),
   statusTabs: document.querySelector("#status-tabs"),
   search: document.querySelector("#search-input"),
+  filterOwner: document.querySelector("#filter-owner"),
   filterLanguage: document.querySelector("#filter-language"),
   filterRarity: document.querySelector("#filter-rarity"),
   sort: document.querySelector("#sort-select"),
@@ -191,6 +195,7 @@ function bindEventListeners() {
   elements.removePhotoButton.addEventListener("click", clearSelectedPhoto);
   elements.statusTabs.addEventListener("click", handleStatusTabClick);
   elements.search.addEventListener("input", render);
+  elements.filterOwner.addEventListener("input", render);
   elements.filterLanguage.addEventListener("change", render);
   elements.filterRarity.addEventListener("change", render);
   elements.sort.addEventListener("change", render);
@@ -383,27 +388,20 @@ function updateOwnerUI() {
   elements.ownerToolbar.hidden = !ownerActive;
   elements.managerShell.hidden = !ownerActive;
   elements.loadSampleButton.hidden = !ownerActive;
-  elements.authForm.hidden = ownerActive;
-  elements.publicNote.hidden = ownerActive;
+  elements.authShell.hidden = ownerActive;
+  elements.ownerSessionPanel.hidden = !ownerActive;
   elements.setupBanner.hidden = Boolean(supabase);
   elements.migrateLocalButton.hidden = !ownerActive || !legacyCards.length;
-
-  const publicOwnerName = resolveArchiveOwnerName();
-  elements.ownerBadge.textContent = ownerActive
-    ? `Owner session: ${publicOwnerName || currentOwner.email || "Authenticated owner"}`
-    : publicOwnerName
-      ? `Archive owner: ${publicOwnerName}`
-      : "Public archive online";
-
-  elements.authNote.textContent = ownerActive
-    ? `Signed in as ${currentOwner.email}. Any changes you save here publish to the shared archive for all visitors.`
-    : "Owner access uses Supabase Auth. Public visitors can browse the archive without signing in.";
 
   if (!ownerActive) {
     resetForm();
     resetSetTargetForm();
+    elements.ownerSessionCopy.textContent = "You are signed in. Collection management tools are active and the login form is hidden.";
   } else {
     syncOwnerNameFields(resolveArchiveOwnerName() || currentOwner.ownerName || inferOwnerNameFromEmail(currentOwner.email));
+    elements.authForm.reset();
+    setAuthFeedback("");
+    elements.ownerSessionCopy.textContent = `Signed in as ${currentOwner.email}. The login form is hidden while you manage your archive, and public visitors can search your owner name to view your collection.`;
   }
 
   render();
@@ -715,10 +713,13 @@ function resetSetTargetForm() {
 }
 
 function render() {
-  const visibleCards = sortCards(filterCards(cards));
-  renderStats(cards);
-  renderSetProgress();
+  const ownerScopedCards = filterCardsByOwner(cards);
+  const ownerScopedTargets = filterSetTargetsByOwner(setTargets);
+  const visibleCards = sortCards(filterCards(ownerScopedCards));
+  renderStats(ownerScopedCards);
+  renderSetProgress(ownerScopedCards, ownerScopedTargets);
   renderSetTargetList();
+  updateOwnerBadge(ownerScopedCards, ownerScopedTargets);
   updateStatusTabs();
   renderGrid(visibleCards);
   elements.resultsCount.textContent = formatResultsSummary(visibleCards.length);
@@ -732,6 +733,7 @@ function filterCards(source) {
 
   return source.filter((card) => {
     const searchTarget = [
+      card.ownerName,
       card.title,
       card.character,
       card.set,
@@ -751,6 +753,24 @@ function filterCards(source) {
 
     return matchesSearch && matchesLanguage && matchesRarity && matchesStatus;
   });
+}
+
+function filterCardsByOwner(source) {
+  const ownerQuery = elements.filterOwner.value.trim().toLowerCase();
+  if (!ownerQuery) {
+    return source;
+  }
+
+  return source.filter((card) => String(card.ownerName || "").toLowerCase().includes(ownerQuery));
+}
+
+function filterSetTargetsByOwner(source) {
+  const ownerQuery = elements.filterOwner.value.trim().toLowerCase();
+  if (!ownerQuery) {
+    return source;
+  }
+
+  return source.filter((target) => String(target.ownerName || "").toLowerCase().includes(ownerQuery));
 }
 
 function sortCards(source) {
@@ -829,10 +849,10 @@ function renderStats(source) {
   elements.tradeCount.textContent = `For Trade ${statusCounts["For Trade"]}`;
 }
 
-function renderSetProgress() {
+function renderSetProgress(sourceCards = cards, sourceTargets = setTargets) {
   elements.setProgressGrid.innerHTML = "";
 
-  const progressEntries = buildSetProgressEntries();
+  const progressEntries = buildSetProgressEntries(sourceCards, sourceTargets);
   if (!progressEntries.length) {
     const emptyState = document.createElement("div");
     emptyState.className = "empty-state";
@@ -1306,15 +1326,15 @@ function archiveKey(card) {
   return `${card.title}::${normalizeLanguage(card.language)}::${normalizeCardStatus(card.status)}::${card.number}::${card.set}`;
 }
 
-function buildSetProgressEntries() {
+function buildSetProgressEntries(sourceCards = cards, sourceTargets = setTargets) {
   const groups = new Map();
 
-  cards.forEach((card) => {
+  sourceCards.forEach((card) => {
     const key = card.set || "Unassigned Set";
     const entry = groups.get(key) || {
       setName: key,
       ownedCards: 0,
-      ownerName: card.ownerName || resolveArchiveOwnerName() || "Archive Owner",
+      ownerName: card.ownerName || resolveArchiveOwnerName(sourceCards, sourceTargets) || "Archive Owner",
       totalCards: 0
     };
 
@@ -1327,11 +1347,11 @@ function buildSetProgressEntries() {
     groups.set(key, entry);
   });
 
-  setTargets.forEach((target) => {
+  sourceTargets.forEach((target) => {
     const entry = groups.get(target.setName) || {
       setName: target.setName,
       ownedCards: 0,
-      ownerName: target.ownerName || resolveArchiveOwnerName() || "Archive Owner",
+      ownerName: target.ownerName || resolveArchiveOwnerName(sourceCards, sourceTargets) || "Archive Owner",
       totalCards: 0
     };
 
@@ -1360,7 +1380,7 @@ function buildSetProgressEntries() {
 
       return {
         ...entry,
-        ownerName: entry.ownerName || resolveArchiveOwnerName() || "Archive Owner",
+        ownerName: entry.ownerName || resolveArchiveOwnerName(sourceCards, sourceTargets) || "Archive Owner",
         percent,
         percentLabel: entry.totalCards > 0 ? `${percent}%` : "Target pending",
         statusLabel,
@@ -1395,14 +1415,24 @@ function statusClass(status) {
 }
 
 function formatResultsSummary(count) {
+  const ownerQuery = getOwnerFilterValue();
   if (selectedStatusFilter === "All") {
-    return `${count} record${count === 1 ? "" : "s"} shown`;
+    return ownerQuery
+      ? `${count} record${count === 1 ? "" : "s"} shown for "${ownerQuery}"`
+      : `${count} record${count === 1 ? "" : "s"} shown`;
   }
 
-  return `${count} ${selectedStatusFilter} record${count === 1 ? "" : "s"} shown`;
+  return ownerQuery
+    ? `${count} ${selectedStatusFilter} record${count === 1 ? "" : "s"} shown for "${ownerQuery}"`
+    : `${count} ${selectedStatusFilter} record${count === 1 ? "" : "s"} shown`;
 }
 
 function emptyStateMessageForStatus() {
+  const ownerQuery = getOwnerFilterValue();
+  if (ownerQuery) {
+    return `No public collection matched the owner name "${ownerQuery}" with the current filters.`;
+  }
+
   if (selectedStatusFilter === "All") {
     return "No shared records are published yet.";
   }
@@ -1410,12 +1440,33 @@ function emptyStateMessageForStatus() {
   return "No records match the selected status tab and filters right now.";
 }
 
-function resolveArchiveOwnerName() {
-  const ownerNames = cards
+function updateOwnerBadge(sourceCards = cards, sourceTargets = setTargets) {
+  const ownerQuery = getOwnerFilterValue();
+  const publicOwnerName = resolveArchiveOwnerName(sourceCards, sourceTargets);
+
+  if (currentOwner) {
+    elements.ownerBadge.textContent = `Owner session: ${publicOwnerName || currentOwner.email || "Authenticated owner"}`;
+    return;
+  }
+
+  if (ownerQuery) {
+    elements.ownerBadge.textContent = publicOwnerName
+      ? `Viewing collection for: ${publicOwnerName}`
+      : `Searching owner: ${ownerQuery}`;
+    return;
+  }
+
+  elements.ownerBadge.textContent = publicOwnerName
+    ? `Archive owner: ${publicOwnerName}`
+    : "Public archive online";
+}
+
+function resolveArchiveOwnerName(sourceCards = cards, sourceTargets = setTargets) {
+  const ownerNames = sourceCards
     .map((card) => String(card.ownerName || "").trim())
     .filter(Boolean);
 
-  setTargets.forEach((target) => {
+  sourceTargets.forEach((target) => {
     const name = String(target.ownerName || "").trim();
     if (name) {
       ownerNames.push(name);
@@ -1436,6 +1487,10 @@ function resolveArchiveOwnerName() {
   });
 
   return [...counts.entries()].sort((left, right) => right[1] - left[1])[0][0];
+}
+
+function getOwnerFilterValue() {
+  return elements.filterOwner.value.trim();
 }
 
 function syncOwnerNameFields(name) {
