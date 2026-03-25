@@ -362,6 +362,7 @@ async function handleAuthSubmit(event) {
   setAuthFeedback("Owner access granted. Management tools are now available.");
   await Promise.all([loadSharedCards(), loadSetTargets()]);
   updateOwnerUI();
+  revealOwnerDashboard();
 }
 
 async function handleLogout() {
@@ -406,6 +407,16 @@ function updateOwnerUI() {
   }
 
   render();
+}
+
+function revealOwnerDashboard() {
+  requestAnimationFrame(() => {
+    elements.dashboardHeading.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    requestAnimationFrame(() => {
+      elements.title.focus({ preventScroll: true });
+    });
+  });
 }
 
 async function handleSetTargetSubmit(event) {
