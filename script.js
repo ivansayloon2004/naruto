@@ -1,4 +1,7 @@
-const STORAGE_KEY = "naruto-kayou-card-archive-v1";
+const CARD_STORAGE_KEY = "naruto-kayou-card-archive-v1";
+const AUTH_PROFILE_KEY = "naruto-kayou-owner-profile-v1";
+const AUTH_SESSION_LOCAL_KEY = "naruto-kayou-owner-session-local-v1";
+const AUTH_SESSION_TEMP_KEY = "naruto-kayou-owner-session-temp-v1";
 
 const SAMPLE_CARDS = [
   {
@@ -58,6 +61,22 @@ const rarityRank = {
 };
 
 const elements = {
+  authScreen: document.querySelector("#auth-screen"),
+  authForm: document.querySelector("#auth-form"),
+  authTitle: document.querySelector("#auth-title"),
+  authCopy: document.querySelector("#auth-copy"),
+  authDisplayNameField: document.querySelector("#auth-display-name-field"),
+  authDisplayName: document.querySelector("#auth-display-name"),
+  authUsername: document.querySelector("#auth-username"),
+  authPassword: document.querySelector("#auth-password"),
+  authConfirmField: document.querySelector("#auth-confirm-field"),
+  authConfirmPassword: document.querySelector("#auth-confirm-password"),
+  authRemember: document.querySelector("#auth-remember"),
+  authSubmitButton: document.querySelector("#auth-submit-button"),
+  authFeedback: document.querySelector("#auth-feedback"),
+  resetLoginButton: document.querySelector("#reset-login-button"),
+  ownerBadge: document.querySelector("#owner-badge"),
+  logoutButton: document.querySelector("#logout-button"),
   form: document.querySelector("#card-form"),
   cardId: document.querySelector("#card-id"),
   title: document.querySelector("#card-title"),
@@ -91,8 +110,16 @@ const elements = {
 };
 
 let cards = loadCards();
+let ownerProfile = loadOwnerProfile();
+let authenticated = false;
+
+syncAuthMode();
+restoreAuthState();
 render();
 
+elements.authForm.addEventListener("submit", handleAuthSubmit);
+elements.resetLoginButton.addEventListener("click", resetSavedLogin);
+elements.logoutButton.addEventListener("click", handleLogout);
 elements.form.addEventListener("submit", handleSubmit);
 elements.resetButton.addEventListener("click", resetForm);
 elements.search.addEventListener("input", render);
@@ -104,9 +131,266 @@ elements.importFile.addEventListener("change", importCards);
 elements.loadSampleButton.addEventListener("click", loadSampleCards);
 elements.grid.addEventListener("click", handleGridClick);
 
+function handleAuthSubmit(event) {
+  event.preventDefault();
+
+  const username = normalizeUsername(elements.authUsername.value);
+  const password = elements.authPassword.value;
+  const remember = elements.authRemember.checked;
+
+  if (!username) {
+    setAuthFeedback("Enter a username before continuing.", true);
+    return;
+  }
+
+  if (!password) {
+    setAuthFeedback("Enter your password before continuing.", true);
+    return;
+  }
+
+  if (!ownerProfile) {
+    const displayName = elements.authDisplayName.value.trim() || "Collector";
+    const confirmPassword = elements.authConfirmPassword.value;
+
+    if (password.length < 4) {
+      setAuthFeedback("Use at least 4 characters for the password.", true);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setAuthFeedback("The password confirmation does not match.", true);
+      return;
+    }
+
+    ownerProfile = {
+      displayName,
+      username,
+      passwordHash: hashCredentials(username, password),
+      createdAt: Date.now()
+    };
+
+    saveOwnerProfile();
+    startSession(username, remember);
+    unlockApp();
+    clearAuthForm();
+    setAuthFeedback("Owner login created. Your archive is unlocked.");
+    return;
+  }
+
+  const matchesProfile =
+    ownerProfile.username === username &&
+    ownerProfile.passwordHash === hashCredentials(username, password);
+
+  if (!matchesProfile) {
+    setAuthFeedback("That username or password does not match the saved owner login.", true);
+    return;
+  }
+
+  startSession(username, remember);
+  unlockApp();
+  clearAuthForm();
+  setAuthFeedback("Welcome back. Your archive is unlocked.");
+}
+
+function resetSavedLogin() {
+  if (!ownerProfile) {
+    clearAuthForm();
+    setAuthFeedback("");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    "Reset the saved owner login for this browser? Your card collection will stay stored, but you will need to create a new login."
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  localStorage.removeItem(AUTH_PROFILE_KEY);
+  clearSession();
+  ownerProfile = null;
+  syncAuthMode();
+  lockApp();
+  clearAuthForm();
+  setAuthFeedback("Saved login removed. Create a new owner login to continue.");
+}
+
+function handleLogout() {
+  clearSession();
+  lockApp();
+  clearAuthForm();
+  setAuthFeedback("Signed out. Enter your owner credentials to unlock the archive again.");
+}
+
+function restoreAuthState() {
+  const session = loadSession();
+
+  if (ownerProfile && session?.username === ownerProfile.username) {
+    unlockApp();
+    return;
+  }
+
+  lockApp();
+}
+
+function unlockApp() {
+  authenticated = true;
+  document.body.classList.remove("auth-locked");
+  document.body.classList.add("is-authenticated");
+  elements.ownerBadge.textContent = `Signed in as ${ownerProfile?.displayName || "Collector"}`;
+}
+
+function lockApp() {
+  authenticated = false;
+  document.body.classList.remove("is-authenticated");
+  document.body.classList.add("auth-locked");
+  syncAuthMode();
+  window.setTimeout(() => {
+    elements.authUsername.focus();
+  }, 40);
+}
+
+function syncAuthMode() {
+  const setupMode = !ownerProfile;
+
+  elements.authTitle.textContent = setupMode ? "Create your owner login." : "Sign in to your Naruto vault.";
+  elements.authCopy.textContent = setupMode
+    ? "Set the display name, username, and password you want to use on this browser for your collection."
+    : `Use the saved owner login for ${ownerProfile.displayName} to unlock the archive.`;
+  elements.authDisplayNameField.hidden = !setupMode;
+  elements.authConfirmField.hidden = !setupMode;
+  elements.resetLoginButton.hidden = setupMode;
+  elements.authSubmitButton.textContent = setupMode ? "Create owner login" : "Sign in";
+  elements.authPassword.autocomplete = setupMode ? "new-password" : "current-password";
+  elements.authConfirmPassword.autocomplete = setupMode ? "new-password" : "off";
+
+  if (setupMode) {
+    elements.authUsername.placeholder = "choose a username";
+  } else {
+    elements.authUsername.placeholder = ownerProfile.username;
+    elements.authDisplayName.value = ownerProfile.displayName;
+  }
+}
+
+function setAuthFeedback(message, isError = false) {
+  elements.authFeedback.textContent = message;
+  elements.authFeedback.classList.toggle("is-error", isError);
+}
+
+function clearAuthForm() {
+  elements.authForm.reset();
+  elements.authRemember.checked = true;
+
+  if (ownerProfile) {
+    elements.authUsername.value = ownerProfile.username;
+    elements.authDisplayName.value = ownerProfile.displayName;
+  }
+}
+
+function loadOwnerProfile() {
+  try {
+    const raw = localStorage.getItem(AUTH_PROFILE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+
+    const username = normalizeUsername(parsed.username);
+    if (!username || !parsed.passwordHash) {
+      return null;
+    }
+
+    return {
+      displayName: String(parsed.displayName || "Collector").trim() || "Collector",
+      username,
+      passwordHash: String(parsed.passwordHash),
+      createdAt: Number(parsed.createdAt) || Date.now()
+    };
+  } catch (error) {
+    console.error("Unable to load owner profile", error);
+    return null;
+  }
+}
+
+function saveOwnerProfile() {
+  localStorage.setItem(AUTH_PROFILE_KEY, JSON.stringify(ownerProfile));
+}
+
+function loadSession() {
+  try {
+    const raw =
+      localStorage.getItem(AUTH_SESSION_LOCAL_KEY) ||
+      sessionStorage.getItem(AUTH_SESSION_TEMP_KEY);
+
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+
+    return {
+      username: normalizeUsername(parsed.username),
+      createdAt: Number(parsed.createdAt) || Date.now()
+    };
+  } catch (error) {
+    console.error("Unable to load auth session", error);
+    return null;
+  }
+}
+
+function startSession(username, remember) {
+  const payload = JSON.stringify({
+    username: normalizeUsername(username),
+    createdAt: Date.now()
+  });
+
+  clearSession();
+
+  if (remember) {
+    localStorage.setItem(AUTH_SESSION_LOCAL_KEY, payload);
+    return;
+  }
+
+  sessionStorage.setItem(AUTH_SESSION_TEMP_KEY, payload);
+}
+
+function clearSession() {
+  localStorage.removeItem(AUTH_SESSION_LOCAL_KEY);
+  sessionStorage.removeItem(AUTH_SESSION_TEMP_KEY);
+}
+
+function normalizeUsername(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function hashCredentials(username, password) {
+  const input = `${normalizeUsername(username)}::${String(password)}`;
+  let hash = 2166136261;
+
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash +=
+      (hash << 1) +
+      (hash << 4) +
+      (hash << 7) +
+      (hash << 8) +
+      (hash << 24);
+  }
+
+  return `h${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
 function loadCards() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(CARD_STORAGE_KEY);
     if (!raw) {
       return [];
     }
@@ -120,11 +404,16 @@ function loadCards() {
 }
 
 function saveCards() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
+  localStorage.setItem(CARD_STORAGE_KEY, JSON.stringify(cards));
 }
 
 function handleSubmit(event) {
   event.preventDefault();
+
+  if (!authenticated) {
+    lockApp();
+    return;
+  }
 
   const card = {
     id: elements.cardId.value || crypto.randomUUID(),
@@ -159,6 +448,10 @@ function handleSubmit(event) {
 }
 
 function handleGridClick(event) {
+  if (!authenticated) {
+    return;
+  }
+
   const editButton = event.target.closest(".edit-button");
   const deleteButton = event.target.closest(".delete-button");
   const cardElement = event.target.closest(".collection-card");
@@ -348,6 +641,10 @@ function renderGrid(source) {
 }
 
 function exportCards() {
+  if (!authenticated) {
+    return;
+  }
+
   const payload = JSON.stringify(cards, null, 2);
   const blob = new Blob([payload], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -359,6 +656,11 @@ function exportCards() {
 }
 
 function importCards(event) {
+  if (!authenticated) {
+    event.target.value = "";
+    return;
+  }
+
   const [file] = event.target.files || [];
   if (!file) {
     return;
@@ -423,6 +725,10 @@ function normalizeLanguage(language) {
 }
 
 function loadSampleCards() {
+  if (!authenticated) {
+    return;
+  }
+
   const existingKeys = new Set(cards.map((card) => sampleKey(card)));
   const incomingSamples = SAMPLE_CARDS
     .filter((card) => !existingKeys.has(sampleKey(card)))

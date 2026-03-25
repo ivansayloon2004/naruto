@@ -6,7 +6,60 @@
   <title>Naruto Kayou Card Archive</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="auth-locked">
+  <section class="auth-screen" id="auth-screen" aria-labelledby="auth-title">
+    <div class="auth-card">
+      <p class="eyebrow">Owner Access</p>
+      <h1 class="auth-title" id="auth-title">Sign in to your Naruto vault.</h1>
+      <p class="auth-copy" id="auth-copy">
+        Create your local owner login the first time you open the archive, then use it to unlock your collection later.
+      </p>
+
+      <div class="auth-language-list" aria-hidden="true">
+        <span>Japanese</span>
+        <span>Chinese</span>
+        <span>English</span>
+      </div>
+
+      <form id="auth-form" class="auth-form">
+        <label class="full-width" id="auth-display-name-field">
+          Display Name
+          <input id="auth-display-name" name="displayName" type="text" placeholder="Hokage Collector">
+        </label>
+
+        <label>
+          Username
+          <input id="auth-username" name="username" type="text" autocomplete="username" placeholder="your username" required>
+        </label>
+
+        <label>
+          Password
+          <input id="auth-password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+        </label>
+
+        <label class="full-width" id="auth-confirm-field">
+          Confirm Password
+          <input id="auth-confirm-password" name="confirmPassword" type="password" autocomplete="new-password" placeholder="Re-enter your password">
+        </label>
+
+        <label class="auth-check full-width">
+          <input id="auth-remember" name="remember" type="checkbox" checked>
+          <span>Keep me signed in on this browser</span>
+        </label>
+
+        <div class="form-actions full-width">
+          <button class="button button-primary" type="submit" id="auth-submit-button">Create owner login</button>
+          <button class="button button-ghost" type="button" id="reset-login-button">Reset saved login</button>
+        </div>
+      </form>
+
+      <p class="auth-feedback" id="auth-feedback" role="status" aria-live="polite"></p>
+      <p class="auth-note">
+        This is a local browser login for a static site, so it protects access on this browser only.
+      </p>
+    </div>
+  </section>
+
   <div class="page-shell">
     <header class="hero">
       <div class="hero-copy">
@@ -16,11 +69,13 @@
           Track every Japanese, Chinese, and English Kayou Naruto card in one place with fast filtering,
           edit history in the browser, and portable backups.
         </p>
+        <p class="owner-badge" id="owner-badge">Signed in as Collector</p>
         <div class="hero-actions">
           <a class="button button-primary" href="#card-form">Add a card</a>
           <button class="button button-secondary" id="export-button" type="button">Export JSON</button>
           <label class="button button-secondary file-button" for="import-file">Import JSON</label>
           <input id="import-file" type="file" accept=".json,application/json">
+          <button class="button button-ghost" id="logout-button" type="button">Log out</button>
         </div>
       </div>
 
