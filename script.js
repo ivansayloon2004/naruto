@@ -88,7 +88,12 @@ const elements = {
   condition: document.querySelector("#card-condition"),
   copies: document.querySelector("#card-copies"),
   date: document.querySelector("#card-date"),
-  image: document.querySelector("#card-image"),
+  photoInput: document.querySelector("#card-photo-input"),
+  photoPreviewWrap: document.querySelector("#card-photo-preview-wrap"),
+  photoPreview: document.querySelector("#card-photo-preview"),
+  photoPlaceholder: document.querySelector("#card-photo-placeholder"),
+  photoNote: document.querySelector("#card-photo-note"),
+  removePhotoButton: document.querySelector("#remove-photo-button"),
   notes: document.querySelector("#card-notes"),
   search: document.querySelector("#search-input"),
   filterLanguage: document.querySelector("#filter-language"),
@@ -112,9 +117,11 @@ const elements = {
 let cards = loadCards();
 let ownerProfile = loadOwnerProfile();
 let authenticated = false;
+let currentCardImage = "";
 
 syncAuthMode();
 restoreAuthState();
+updatePhotoPreview("", "No photo selected. On phones, this can open the camera. On desktop, it lets you choose an image file.");
 render();
 
 elements.authForm.addEventListener("submit", handleAuthSubmit);
@@ -122,6 +129,8 @@ elements.resetLoginButton.addEventListener("click", resetSavedLogin);
 elements.logoutButton.addEventListener("click", handleLogout);
 elements.form.addEventListener("submit", handleSubmit);
 elements.resetButton.addEventListener("click", resetForm);
+elements.photoInput.addEventListener("change", handlePhotoChange);
+elements.removePhotoButton.addEventListener("click", clearSelectedPhoto);
 elements.search.addEventListener("input", render);
 elements.filterLanguage.addEventListener("change", render);
 elements.filterRarity.addEventListener("change", render);
@@ -403,8 +412,41 @@ function loadCards() {
   }
 }
 
-function saveCards() {
-  localStorage.setItem(CARD_STORAGE_KEY, JSON.stringify(cards));
+function saveCards(nextCards = cards) {
+  try {
+    localStorage.setItem(CARD_STORAGE_KEY, JSON.stringify(nextCards));
+    cards = nextCards;
+    return true;
+  } catch (error) {
+    console.error("Unable to save cards", error);
+    window.alert("The archive could not be saved. Large card photos can exceed browser storage, so try a smaller image or remove older photos.");
+    return false;
+  }
+}
+
+async function handlePhotoChange(event) {
+  const [file] = event.target.files || [];
+  if (!file) {
+    return;
+  }
+
+  if (!file.type.startsWith("image/")) {
+    updatePhotoPreview("", "Select an image file to continue.");
+    event.target.value = "";
+    return;
+  }
+
+  try {
+    elements.photoNote.textContent = "Preparing card photo...";
+    const imageData = await resizeImageFile(file);
+    currentCardImage = imageData;
+    updatePhotoPreview(currentCardImage, `Photo ready: ${file.name}`);
+  } catch (error) {
+    console.error("Unable to process selected photo", error);
+    updatePhotoPreview("", "That photo could not be processed. Try another image.");
+  } finally {
+    event.target.value = "";
+  }
 }
 
 function handleSubmit(event) {
@@ -426,7 +468,7 @@ function handleSubmit(event) {
     condition: elements.condition.value,
     copies: Number(elements.copies.value) || 1,
     acquisitionDate: elements.date.value,
-    image: elements.image.value.trim(),
+    image: currentCardImage,
     notes: elements.notes.value.trim(),
     createdAt: elements.cardId.value ? findCreatedAt(elements.cardId.value) : Date.now()
   };
@@ -435,14 +477,18 @@ function handleSubmit(event) {
     return;
   }
 
-  const existingIndex = cards.findIndex((entry) => entry.id === card.id);
+  const nextCards = [...cards];
+  const existingIndex = nextCards.findIndex((entry) => entry.id === card.id);
   if (existingIndex >= 0) {
-    cards[existingIndex] = card;
+    nextCards[existingIndex] = card;
   } else {
-    cards.unshift(card);
+    nextCards.unshift(card);
   }
 
-  saveCards();
+  if (!saveCards(nextCards)) {
+    return;
+  }
+
   resetForm();
   render();
 }
@@ -476,8 +522,11 @@ function handleGridClick(event) {
       return;
     }
 
-    cards = cards.filter((entry) => entry.id !== id);
-    saveCards();
+    const nextCards = cards.filter((entry) => entry.id !== id);
+    if (!saveCards(nextCards)) {
+      return;
+    }
+
     resetForm();
     render();
   }
@@ -494,7 +543,8 @@ function populateForm(card) {
   elements.condition.value = card.condition;
   elements.copies.value = card.copies;
   elements.date.value = card.acquisitionDate || "";
-  elements.image.value = card.image || "";
+  currentCardImage = card.image || "";
+  updatePhotoPreview(currentCardImage, currentCardImage ? "Saved card photo loaded." : "No photo selected.");
   elements.notes.value = card.notes || "";
   elements.saveButton.textContent = "Update card";
   elements.form.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -507,6 +557,7 @@ function resetForm() {
   elements.rarity.value = "Common";
   elements.condition.value = "Mint";
   elements.copies.value = 1;
+  clearSelectedPhoto();
   elements.saveButton.textContent = "Save card";
 }
 
@@ -674,8 +725,11 @@ function importCards(event) {
         throw new Error("Imported file must contain an array of cards.");
       }
 
-      cards = parsed.map(normalizeImportedCard);
-      saveCards();
+      const nextCards = parsed.map(normalizeImportedCard);
+      if (!saveCards(nextCards)) {
+        return;
+      }
+
       resetForm();
       render();
     } catch (error) {
@@ -739,8 +793,11 @@ function loadSampleCards() {
     return;
   }
 
-  cards = [...incomingSamples, ...cards];
-  saveCards();
+  const nextCards = [...incomingSamples, ...cards];
+  if (!saveCards(nextCards)) {
+    return;
+  }
+
   resetForm();
   render();
 }
@@ -780,4 +837,62 @@ function findCreatedAt(id) {
 
 function sampleKey(card) {
   return `${card.title}::${normalizeLanguage(card.language)}::${card.number}`;
+}
+
+function clearSelectedPhoto() {
+  currentCardImage = "";
+  updatePhotoPreview("", "No photo selected. On phones, this can open the camera. On desktop, it lets you choose an image file.");
+}
+
+function updatePhotoPreview(imageData, message) {
+  if (imageData) {
+    elements.photoPreview.src = imageData;
+    elements.photoPreview.hidden = false;
+    elements.photoPreviewWrap.classList.remove("is-empty");
+    elements.photoPlaceholder.hidden = true;
+  } else {
+    elements.photoPreview.removeAttribute("src");
+    elements.photoPreview.hidden = true;
+    elements.photoPreviewWrap.classList.add("is-empty");
+    elements.photoPlaceholder.hidden = false;
+  }
+
+  elements.photoNote.textContent = message;
+}
+
+function resizeImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const image = new Image();
+
+      image.onload = () => {
+        const maxDimension = 1280;
+        const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+
+        if (!context) {
+          reject(new Error("Canvas is not available."));
+          return;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        context.drawImage(image, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+        resolve(dataUrl);
+      };
+
+      image.onerror = () => reject(new Error("Selected file could not be read as an image."));
+      image.src = String(reader.result);
+    };
+
+    reader.onerror = () => reject(new Error("Selected file could not be read."));
+    reader.readAsDataURL(file);
+  });
 }

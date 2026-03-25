@@ -179,10 +179,23 @@
             <input id="card-date" name="date" type="date">
           </label>
 
-          <label>
-            Image URL
-            <input id="card-image" name="image" type="url" placeholder="https://example.com/card.jpg">
-          </label>
+          <div class="full-width photo-field">
+            <span class="field-label">Card Photo</span>
+            <div class="photo-uploader">
+              <div class="photo-preview is-empty" id="card-photo-preview-wrap">
+                <img id="card-photo-preview" class="photo-preview-image" alt="Selected card photo preview" hidden>
+                <div class="photo-preview-placeholder" id="card-photo-placeholder">No photo selected</div>
+              </div>
+              <div class="photo-actions">
+                <label class="button button-secondary file-button" for="card-photo-input">Take or Upload Photo</label>
+                <input id="card-photo-input" type="file" accept="image/*" capture="environment">
+                <button class="button button-ghost" id="remove-photo-button" type="button">Remove Photo</button>
+              </div>
+              <p class="field-note" id="card-photo-note">
+                On phones, this can open the camera. On desktop, it lets you choose an image file.
+              </p>
+            </div>
+          </div>
 
           <label class="full-width">
             Notes
