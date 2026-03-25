@@ -153,7 +153,7 @@ function handleAuthSubmit(event) {
     const confirmPassword = elements.authConfirmPassword.value;
 
     if (password.length < 4) {
-      setAuthFeedback("Use at least 4 characters for the password.", true);
+      setAuthFeedback("Use a password with at least 4 characters.", true);
       return;
     }
 
@@ -173,7 +173,7 @@ function handleAuthSubmit(event) {
     startSession(username, remember);
     unlockApp();
     clearAuthForm();
-    setAuthFeedback("Owner login created. Your archive is unlocked.");
+    setAuthFeedback("Owner access created. The archive is now available.");
     return;
   }
 
@@ -182,14 +182,14 @@ function handleAuthSubmit(event) {
     ownerProfile.passwordHash === hashCredentials(username, password);
 
   if (!matchesProfile) {
-    setAuthFeedback("That username or password does not match the saved owner login.", true);
+    setAuthFeedback("The username or password does not match the saved owner access.", true);
     return;
   }
 
   startSession(username, remember);
   unlockApp();
   clearAuthForm();
-  setAuthFeedback("Welcome back. Your archive is unlocked.");
+  setAuthFeedback("Access granted. Welcome back to the archive.");
 }
 
 function resetSavedLogin() {
@@ -200,7 +200,7 @@ function resetSavedLogin() {
   }
 
   const confirmed = window.confirm(
-    "Reset the saved owner login for this browser? Your card collection will stay stored, but you will need to create a new login."
+    "Reset the saved owner access for this browser? Your card collection will stay stored, but you will need to create a new access profile."
   );
 
   if (!confirmed) {
@@ -213,14 +213,14 @@ function resetSavedLogin() {
   syncAuthMode();
   lockApp();
   clearAuthForm();
-  setAuthFeedback("Saved login removed. Create a new owner login to continue.");
+  setAuthFeedback("Saved access removed. Create a new owner access profile to continue.");
 }
 
 function handleLogout() {
   clearSession();
   lockApp();
   clearAuthForm();
-  setAuthFeedback("Signed out. Enter your owner credentials to unlock the archive again.");
+  setAuthFeedback("Signed out. Enter your credentials to authorize access again.");
 }
 
 function restoreAuthState() {
@@ -238,7 +238,7 @@ function unlockApp() {
   authenticated = true;
   document.body.classList.remove("auth-locked");
   document.body.classList.add("is-authenticated");
-  elements.ownerBadge.textContent = `Signed in as ${ownerProfile?.displayName || "Collector"}`;
+  elements.ownerBadge.textContent = `Authorized user: ${ownerProfile?.displayName || "Collector"}`;
 }
 
 function lockApp() {
@@ -254,19 +254,19 @@ function lockApp() {
 function syncAuthMode() {
   const setupMode = !ownerProfile;
 
-  elements.authTitle.textContent = setupMode ? "Create your owner login." : "Sign in to your Naruto vault.";
+  elements.authTitle.textContent = setupMode ? "Create your owner access." : "Authorize access to the archive.";
   elements.authCopy.textContent = setupMode
-    ? "Set the display name, username, and password you want to use on this browser for your collection."
-    : `Use the saved owner login for ${ownerProfile.displayName} to unlock the archive.`;
+    ? "Set the display name, username, and password that will authorize this browser for your collection."
+    : `Use the saved owner access for ${ownerProfile.displayName} to unlock the archive.`;
   elements.authDisplayNameField.hidden = !setupMode;
   elements.authConfirmField.hidden = !setupMode;
   elements.resetLoginButton.hidden = setupMode;
-  elements.authSubmitButton.textContent = setupMode ? "Create owner login" : "Sign in";
+  elements.authSubmitButton.textContent = setupMode ? "Create owner access" : "Authorize access";
   elements.authPassword.autocomplete = setupMode ? "new-password" : "current-password";
   elements.authConfirmPassword.autocomplete = setupMode ? "new-password" : "off";
 
   if (setupMode) {
-    elements.authUsername.placeholder = "choose a username";
+    elements.authUsername.placeholder = "Choose a username";
   } else {
     elements.authUsername.placeholder = ownerProfile.username;
     elements.authDisplayName.value = ownerProfile.displayName;

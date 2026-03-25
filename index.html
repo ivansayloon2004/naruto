@@ -10,9 +10,9 @@
   <section class="auth-screen" id="auth-screen" aria-labelledby="auth-title">
     <div class="auth-card">
       <p class="eyebrow">Owner Access</p>
-      <h1 class="auth-title" id="auth-title">Sign in to your Naruto vault.</h1>
+      <h1 class="auth-title" id="auth-title">Authorize access to the archive.</h1>
       <p class="auth-copy" id="auth-copy">
-        Create your local owner login the first time you open the archive, then use it to unlock your collection later.
+        Create your local owner access profile the first time you open the archive, then use it to authorize future visits.
       </p>
 
       <div class="auth-language-list" aria-hidden="true">
@@ -24,12 +24,12 @@
       <form id="auth-form" class="auth-form">
         <label class="full-width" id="auth-display-name-field">
           Display Name
-          <input id="auth-display-name" name="displayName" type="text" placeholder="Hokage Collector">
+          <input id="auth-display-name" name="displayName" type="text" placeholder="Archive Owner">
         </label>
 
         <label>
           Username
-          <input id="auth-username" name="username" type="text" autocomplete="username" placeholder="your username" required>
+          <input id="auth-username" name="username" type="text" autocomplete="username" placeholder="Enter your username" required>
         </label>
 
         <label>
@@ -44,18 +44,18 @@
 
         <label class="auth-check full-width">
           <input id="auth-remember" name="remember" type="checkbox" checked>
-          <span>Keep me signed in on this browser</span>
+          <span>Keep this browser authorized</span>
         </label>
 
         <div class="form-actions full-width">
-          <button class="button button-primary" type="submit" id="auth-submit-button">Create owner login</button>
-          <button class="button button-ghost" type="button" id="reset-login-button">Reset saved login</button>
+          <button class="button button-primary" type="submit" id="auth-submit-button">Create owner access</button>
+          <button class="button button-ghost" type="button" id="reset-login-button">Reset saved access</button>
         </div>
       </form>
 
       <p class="auth-feedback" id="auth-feedback" role="status" aria-live="polite"></p>
       <p class="auth-note">
-        This is a local browser login for a static site, so it protects access on this browser only.
+        This is a browser-local sign-in for a static site and protects access on this device only.
       </p>
     </div>
   </section>
@@ -63,24 +63,24 @@
   <div class="page-shell">
     <header class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">Naruto Kayou Collection</p>
-        <h1>Build your own multilingual card vault.</h1>
+        <p class="eyebrow">Private Collection Archive</p>
+        <h1>Maintain your Naruto Kayou collection with a formal archive.</h1>
         <p class="hero-text">
-          Track every Japanese, Chinese, and English Kayou Naruto card in one place with fast filtering,
-          edit history in the browser, and portable backups.
+          Keep Japanese, Chinese, and English editions in one structured record with controlled access,
+          fast search, collection metrics, and portable archive exports.
         </p>
-        <p class="owner-badge" id="owner-badge">Signed in as Collector</p>
+        <p class="owner-badge" id="owner-badge">Authorized user: Collector</p>
         <div class="hero-actions">
-          <a class="button button-primary" href="#card-form">Add a card</a>
-          <button class="button button-secondary" id="export-button" type="button">Export JSON</button>
-          <label class="button button-secondary file-button" for="import-file">Import JSON</label>
+          <a class="button button-primary" href="#card-form">Add record</a>
+          <button class="button button-secondary" id="export-button" type="button">Export archive</button>
+          <label class="button button-secondary file-button" for="import-file">Import archive</label>
           <input id="import-file" type="file" accept=".json,application/json">
-          <button class="button button-ghost" id="logout-button" type="button">Log out</button>
+          <button class="button button-ghost" id="logout-button" type="button">Sign out</button>
         </div>
       </div>
 
       <div class="hero-panel">
-        <div class="panel-label">Collection Pulse</div>
+        <div class="panel-label">Collection Overview</div>
         <div class="stat-grid">
           <article class="stat-card">
             <span class="stat-title">Unique Entries</span>
@@ -109,9 +109,9 @@
     <main class="layout">
       <section class="panel form-panel">
         <div class="section-heading">
-          <p class="eyebrow">Card Entry</p>
-          <h2>Add or update a card</h2>
-          <p>Create separate entries when you own the same artwork in different languages.</p>
+          <p class="eyebrow">Collection Record</p>
+          <h2>Register or update a card</h2>
+          <p>Maintain separate records whenever the same artwork exists in different languages or releases.</p>
         </div>
 
         <form id="card-form" class="card-form">
@@ -198,15 +198,15 @@
 
       <section class="panel collection-panel">
         <div class="section-heading">
-          <p class="eyebrow">Collection View</p>
-          <h2>Search and filter your archive</h2>
-          <p>Instantly narrow the list by language, rarity, condition, or name.</p>
+          <p class="eyebrow">Archive Search</p>
+          <h2>Review and filter your records</h2>
+          <p>Search by title, character, set, card number, language, and rarity across the archive.</p>
         </div>
 
         <div class="toolbar">
           <label class="toolbar-item search-field">
             Search
-            <input id="search-input" type="search" placeholder="Naruto, Sasuke, MR-001, Tier 4...">
+            <input id="search-input" type="search" placeholder="Title, character, card number, set...">
           </label>
 
           <label class="toolbar-item">
@@ -246,7 +246,7 @@
 
         <div class="collection-meta">
           <span id="results-count">0 cards shown</span>
-          <button class="button button-ghost small" id="load-sample-button" type="button">Add starter sample</button>
+          <button class="button button-ghost small" id="load-sample-button" type="button">Load sample records</button>
         </div>
 
         <div id="collection-grid" class="collection-grid" aria-live="polite"></div>
@@ -258,7 +258,7 @@
     <article class="collection-card">
       <div class="card-image-wrap">
         <img class="card-image" alt="">
-        <div class="card-image-fallback">No image</div>
+        <div class="card-image-fallback">Image unavailable</div>
       </div>
       <div class="card-body">
         <div class="card-topline">
