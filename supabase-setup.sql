@@ -1,0 +1,67 @@
+create table if not exists public.kayou_cards (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  character text not null,
+  set_name text not null,
+  card_number text,
+  language text not null check (language in ('Japanese', 'Chinese', 'English')),
+  rarity text not null,
+  condition text,
+  copies integer not null default 1 check (copies > 0),
+  acquisition_date date,
+  image_data text,
+  notes text,
+  owner_user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists kayou_cards_created_at_idx
+  on public.kayou_cards (created_at desc);
+
+create or replace function public.set_kayou_cards_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = timezone('utc', now());
+  return new;
+end;
+$$;
+
+drop trigger if exists kayou_cards_set_updated_at on public.kayou_cards;
+
+create trigger kayou_cards_set_updated_at
+before update on public.kayou_cards
+for each row
+execute function public.set_kayou_cards_updated_at();
+
+alter table public.kayou_cards enable row level security;
+
+drop policy if exists "Public read kayou cards" on public.kayou_cards;
+create policy "Public read kayou cards"
+on public.kayou_cards
+for select
+using (true);
+
+drop policy if exists "Owners insert kayou cards" on public.kayou_cards;
+create policy "Owners insert kayou cards"
+on public.kayou_cards
+for insert
+to authenticated
+with check (auth.uid() = owner_user_id);
+
+drop policy if exists "Owners update kayou cards" on public.kayou_cards;
+create policy "Owners update kayou cards"
+on public.kayou_cards
+for update
+to authenticated
+using (auth.uid() = owner_user_id)
+with check (auth.uid() = owner_user_id);
+
+drop policy if exists "Owners delete kayou cards" on public.kayou_cards;
+create policy "Owners delete kayou cards"
+on public.kayou_cards
+for delete
+to authenticated
+using (auth.uid() = owner_user_id);

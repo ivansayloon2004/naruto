@@ -491,6 +491,37 @@ h2 {
   line-height: 1.55;
 }
 
+.setup-banner,
+.public-note {
+  margin-top: 1.25rem;
+  padding: 0.95rem 1rem;
+  border-radius: var(--radius-md);
+  line-height: 1.6;
+}
+
+.setup-banner {
+  border: 1px solid rgba(180, 35, 24, 0.18);
+  background: rgba(180, 35, 24, 0.08);
+  color: #7a271a;
+  font-weight: 600;
+}
+
+.public-note {
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+
+#manager-shell {
+  display: grid;
+  gap: 1.2rem;
+  margin-top: 1.35rem;
+}
+
+.manager-heading {
+  padding-top: 0.15rem;
+}
+
 .hero {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.9fr);

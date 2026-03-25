@@ -1,7 +1,5 @@
-const CARD_STORAGE_KEY = "naruto-kayou-card-archive-v1";
-const AUTH_PROFILE_KEY = "naruto-kayou-owner-profile-v1";
-const AUTH_SESSION_LOCAL_KEY = "naruto-kayou-owner-session-local-v1";
-const AUTH_SESSION_TEMP_KEY = "naruto-kayou-owner-session-temp-v1";
+const LEGACY_STORAGE_KEY = "naruto-kayou-card-archive-v1";
+const SUPABASE_TABLE = "kayou_cards";
 
 const SAMPLE_CARDS = [
   {
@@ -61,21 +59,19 @@ const rarityRank = {
 };
 
 const elements = {
-  authScreen: document.querySelector("#auth-screen"),
   authForm: document.querySelector("#auth-form"),
-  authTitle: document.querySelector("#auth-title"),
-  authCopy: document.querySelector("#auth-copy"),
-  authDisplayNameField: document.querySelector("#auth-display-name-field"),
-  authDisplayName: document.querySelector("#auth-display-name"),
-  authUsername: document.querySelector("#auth-username"),
+  authEmail: document.querySelector("#auth-email"),
   authPassword: document.querySelector("#auth-password"),
-  authConfirmField: document.querySelector("#auth-confirm-field"),
-  authConfirmPassword: document.querySelector("#auth-confirm-password"),
-  authRemember: document.querySelector("#auth-remember"),
   authSubmitButton: document.querySelector("#auth-submit-button"),
   authFeedback: document.querySelector("#auth-feedback"),
-  resetLoginButton: document.querySelector("#reset-login-button"),
+  authNote: document.querySelector("#auth-note"),
+  setupBanner: document.querySelector("#setup-banner"),
+  publicNote: document.querySelector("#public-note"),
   ownerBadge: document.querySelector("#owner-badge"),
+  ownerToolbar: document.querySelector("#owner-toolbar"),
+  refreshButton: document.querySelector("#refresh-button"),
+  migrateLocalButton: document.querySelector("#migrate-local-button"),
+  managerShell: document.querySelector("#manager-shell"),
   logoutButton: document.querySelector("#logout-button"),
   form: document.querySelector("#card-form"),
   cardId: document.querySelector("#card-id"),
@@ -114,314 +110,192 @@ const elements = {
   loadSampleButton: document.querySelector("#load-sample-button")
 };
 
-let cards = loadCards();
-let ownerProfile = loadOwnerProfile();
-let authenticated = false;
+const config = window.SUPABASE_CONFIG || {};
+const hasSupabaseClient = Boolean(window.supabase && typeof window.supabase.createClient === "function");
+const hasSupabaseConfig = Boolean(config.url && config.anonKey && hasSupabaseClient);
+const supabase = hasSupabaseConfig
+  ? window.supabase.createClient(config.url, config.anonKey)
+  : null;
+
+let cards = [];
+let legacyCards = loadLegacyCards();
+let currentOwner = null;
 let currentCardImage = "";
 
-syncAuthMode();
-restoreAuthState();
+bindEventListeners();
 updatePhotoPreview("", "No photo selected. On phones, this can open the camera. On desktop, it lets you choose an image file.");
-render();
+initializeApp();
 
-elements.authForm.addEventListener("submit", handleAuthSubmit);
-elements.resetLoginButton.addEventListener("click", resetSavedLogin);
-elements.logoutButton.addEventListener("click", handleLogout);
-elements.form.addEventListener("submit", handleSubmit);
-elements.resetButton.addEventListener("click", resetForm);
-elements.photoInput.addEventListener("change", handlePhotoChange);
-elements.removePhotoButton.addEventListener("click", clearSelectedPhoto);
-elements.search.addEventListener("input", render);
-elements.filterLanguage.addEventListener("change", render);
-elements.filterRarity.addEventListener("change", render);
-elements.sort.addEventListener("change", render);
-elements.exportButton.addEventListener("click", exportCards);
-elements.importFile.addEventListener("change", importCards);
-elements.loadSampleButton.addEventListener("click", loadSampleCards);
-elements.grid.addEventListener("click", handleGridClick);
+function bindEventListeners() {
+  elements.authForm.addEventListener("submit", handleAuthSubmit);
+  elements.refreshButton.addEventListener("click", () => {
+    void loadSharedCards();
+  });
+  elements.migrateLocalButton.addEventListener("click", () => {
+    void publishLegacyCards();
+  });
+  elements.logoutButton.addEventListener("click", () => {
+    void handleLogout();
+  });
+  elements.form.addEventListener("submit", handleSubmit);
+  elements.resetButton.addEventListener("click", resetForm);
+  elements.photoInput.addEventListener("change", handlePhotoChange);
+  elements.removePhotoButton.addEventListener("click", clearSelectedPhoto);
+  elements.search.addEventListener("input", render);
+  elements.filterLanguage.addEventListener("change", render);
+  elements.filterRarity.addEventListener("change", render);
+  elements.sort.addEventListener("change", render);
+  elements.exportButton.addEventListener("click", exportCards);
+  elements.importFile.addEventListener("change", importCards);
+  elements.loadSampleButton.addEventListener("click", () => {
+    void loadSampleCards();
+  });
+  elements.grid.addEventListener("click", (event) => {
+    void handleGridClick(event);
+  });
+}
 
-function handleAuthSubmit(event) {
-  event.preventDefault();
+async function initializeApp() {
+  elements.authSubmitButton.disabled = !supabase;
+  updateOwnerUI();
+  render();
 
-  const username = normalizeUsername(elements.authUsername.value);
-  const password = elements.authPassword.value;
-  const remember = elements.authRemember.checked;
-
-  if (!username) {
-    setAuthFeedback("Enter a username before continuing.", true);
+  if (!supabase) {
+    elements.setupBanner.hidden = false;
+    cards = legacyCards;
+    setAuthFeedback(
+      "Supabase is not configured yet. The page is only showing browser-local records on this device until shared storage is connected.",
+      true
+    );
+    render();
     return;
   }
 
-  if (!password) {
-    setAuthFeedback("Enter your password before continuing.", true);
-    return;
-  }
-
-  if (!ownerProfile) {
-    const displayName = elements.authDisplayName.value.trim() || "Collector";
-    const confirmPassword = elements.authConfirmPassword.value;
-
-    if (password.length < 4) {
-      setAuthFeedback("Use a password with at least 4 characters.", true);
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setAuthFeedback("The password confirmation does not match.", true);
-      return;
-    }
-
-    ownerProfile = {
-      displayName,
-      username,
-      passwordHash: hashCredentials(username, password),
-      createdAt: Date.now()
-    };
-
-    saveOwnerProfile();
-    startSession(username, remember);
-    unlockApp();
-    clearAuthForm();
-    setAuthFeedback("Owner access created. The archive is now available.");
-    return;
-  }
-
-  const matchesProfile =
-    ownerProfile.username === username &&
-    ownerProfile.passwordHash === hashCredentials(username, password);
-
-  if (!matchesProfile) {
-    setAuthFeedback("The username or password does not match the saved owner access.", true);
-    return;
-  }
-
-  startSession(username, remember);
-  unlockApp();
-  clearAuthForm();
-  setAuthFeedback("Access granted. Welcome back to the archive.");
-}
-
-function resetSavedLogin() {
-  if (!ownerProfile) {
-    clearAuthForm();
-    setAuthFeedback("");
-    return;
-  }
-
-  const confirmed = window.confirm(
-    "Reset the saved owner access for this browser? Your card collection will stay stored, but you will need to create a new access profile."
-  );
-
-  if (!confirmed) {
-    return;
-  }
-
-  localStorage.removeItem(AUTH_PROFILE_KEY);
-  clearSession();
-  ownerProfile = null;
-  syncAuthMode();
-  lockApp();
-  clearAuthForm();
-  setAuthFeedback("Saved access removed. Create a new owner access profile to continue.");
-}
-
-function handleLogout() {
-  clearSession();
-  lockApp();
-  clearAuthForm();
-  setAuthFeedback("Signed out. Enter your credentials to authorize access again.");
-}
-
-function restoreAuthState() {
-  const session = loadSession();
-
-  if (ownerProfile && session?.username === ownerProfile.username) {
-    unlockApp();
-    return;
-  }
-
-  lockApp();
-}
-
-function unlockApp() {
-  authenticated = true;
-  document.body.classList.remove("auth-locked");
-  document.body.classList.add("is-authenticated");
-  elements.ownerBadge.textContent = `Authorized user: ${ownerProfile?.displayName || "Collector"}`;
-}
-
-function lockApp() {
-  authenticated = false;
-  document.body.classList.remove("is-authenticated");
-  document.body.classList.add("auth-locked");
-  syncAuthMode();
-  window.setTimeout(() => {
-    elements.authUsername.focus();
-  }, 40);
-}
-
-function syncAuthMode() {
-  const setupMode = !ownerProfile;
-
-  elements.authTitle.textContent = setupMode ? "Create your owner access." : "Authorize access to the archive.";
-  elements.authCopy.textContent = setupMode
-    ? "Set the display name, username, and password that will authorize this browser for your collection."
-    : `Use the saved owner access for ${ownerProfile.displayName} to unlock the archive.`;
-  elements.authDisplayNameField.hidden = !setupMode;
-  elements.authConfirmField.hidden = !setupMode;
-  elements.resetLoginButton.hidden = setupMode;
-  elements.authSubmitButton.textContent = setupMode ? "Create owner access" : "Authorize access";
-  elements.authPassword.autocomplete = setupMode ? "new-password" : "current-password";
-  elements.authConfirmPassword.autocomplete = setupMode ? "new-password" : "off";
-
-  if (setupMode) {
-    elements.authUsername.placeholder = "Choose a username";
-  } else {
-    elements.authUsername.placeholder = ownerProfile.username;
-    elements.authDisplayName.value = ownerProfile.displayName;
-  }
-}
-
-function setAuthFeedback(message, isError = false) {
-  elements.authFeedback.textContent = message;
-  elements.authFeedback.classList.toggle("is-error", isError);
-}
-
-function clearAuthForm() {
-  elements.authForm.reset();
-  elements.authRemember.checked = true;
-
-  if (ownerProfile) {
-    elements.authUsername.value = ownerProfile.username;
-    elements.authDisplayName.value = ownerProfile.displayName;
-  }
-}
-
-function loadOwnerProfile() {
-  try {
-    const raw = localStorage.getItem(AUTH_PROFILE_KEY);
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") {
-      return null;
-    }
-
-    const username = normalizeUsername(parsed.username);
-    if (!username || !parsed.passwordHash) {
-      return null;
-    }
-
-    return {
-      displayName: String(parsed.displayName || "Collector").trim() || "Collector",
-      username,
-      passwordHash: String(parsed.passwordHash),
-      createdAt: Number(parsed.createdAt) || Date.now()
-    };
-  } catch (error) {
-    console.error("Unable to load owner profile", error);
-    return null;
-  }
-}
-
-function saveOwnerProfile() {
-  localStorage.setItem(AUTH_PROFILE_KEY, JSON.stringify(ownerProfile));
-}
-
-function loadSession() {
-  try {
-    const raw =
-      localStorage.getItem(AUTH_SESSION_LOCAL_KEY) ||
-      sessionStorage.getItem(AUTH_SESSION_TEMP_KEY);
-
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") {
-      return null;
-    }
-
-    return {
-      username: normalizeUsername(parsed.username),
-      createdAt: Number(parsed.createdAt) || Date.now()
-    };
-  } catch (error) {
-    console.error("Unable to load auth session", error);
-    return null;
-  }
-}
-
-function startSession(username, remember) {
-  const payload = JSON.stringify({
-    username: normalizeUsername(username),
-    createdAt: Date.now()
+  supabase.auth.onAuthStateChange((_event, session) => {
+    currentOwner = session?.user || null;
+    updateOwnerUI();
   });
 
-  clearSession();
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    console.error("Unable to restore owner session", error);
+  }
 
-  if (remember) {
-    localStorage.setItem(AUTH_SESSION_LOCAL_KEY, payload);
+  currentOwner = data?.session?.user || null;
+  updateOwnerUI();
+  await loadSharedCards();
+}
+
+async function loadSharedCards() {
+  if (!supabase) {
+    cards = legacyCards;
+    render();
     return;
   }
 
-  sessionStorage.setItem(AUTH_SESSION_TEMP_KEY, payload);
-}
+  const { data, error } = await supabase
+    .from(SUPABASE_TABLE)
+    .select("*")
+    .order("created_at", { ascending: false });
 
-function clearSession() {
-  localStorage.removeItem(AUTH_SESSION_LOCAL_KEY);
-  sessionStorage.removeItem(AUTH_SESSION_TEMP_KEY);
-}
-
-function normalizeUsername(value) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function hashCredentials(username, password) {
-  const input = `${normalizeUsername(username)}::${String(password)}`;
-  let hash = 2166136261;
-
-  for (let index = 0; index < input.length; index += 1) {
-    hash ^= input.charCodeAt(index);
-    hash +=
-      (hash << 1) +
-      (hash << 4) +
-      (hash << 7) +
-      (hash << 8) +
-      (hash << 24);
-  }
-
-  return `h${(hash >>> 0).toString(16).padStart(8, "0")}`;
-}
-
-function loadCards() {
-  try {
-    const raw = localStorage.getItem(CARD_STORAGE_KEY);
-    if (!raw) {
-      return [];
+  if (error) {
+    console.error("Unable to load shared archive", error);
+    if (!cards.length && legacyCards.length) {
+      cards = legacyCards;
     }
-
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    console.error("Unable to load saved cards", error);
-    return [];
+    setAuthFeedback(
+      "The shared archive could not be loaded. Confirm the Supabase table, policies, and config values.",
+      true
+    );
+    render();
+    return;
   }
+
+  cards = (data || []).map(mapRowToCard);
+  if (!currentOwner) {
+    setAuthFeedback("");
+  }
+  render();
 }
 
-function saveCards(nextCards = cards) {
-  try {
-    localStorage.setItem(CARD_STORAGE_KEY, JSON.stringify(nextCards));
-    cards = nextCards;
-    return true;
-  } catch (error) {
-    console.error("Unable to save cards", error);
-    window.alert("The archive could not be saved. Large card photos can exceed browser storage, so try a smaller image or remove older photos.");
-    return false;
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+
+  if (!supabase) {
+    setAuthFeedback("Add your Supabase project values in supabase-config.js before signing in.", true);
+    return;
   }
+
+  const email = elements.authEmail.value.trim();
+  const password = elements.authPassword.value;
+
+  if (!email || !password) {
+    setAuthFeedback("Enter the owner email and password to continue.", true);
+    return;
+  }
+
+  setAuthFeedback("Authorizing owner access...");
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) {
+    setAuthFeedback(error.message, true);
+    return;
+  }
+
+  currentOwner = data?.user || data?.session?.user || null;
+  elements.authForm.reset();
+  updateOwnerUI();
+  setAuthFeedback("Owner access granted. Management tools are now available.");
+  await loadSharedCards();
+}
+
+async function handleLogout() {
+  if (!supabase) {
+    return;
+  }
+
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    setAuthFeedback(error.message, true);
+    return;
+  }
+
+  currentOwner = null;
+  updateOwnerUI();
+  setAuthFeedback("Signed out. The archive remains visible to all visitors.");
+}
+
+function updateOwnerUI() {
+  const ownerActive = Boolean(currentOwner);
+
+  document.body.classList.toggle("owner-mode", ownerActive);
+  document.body.classList.toggle("viewer-mode", !ownerActive);
+
+  elements.ownerToolbar.hidden = !ownerActive;
+  elements.managerShell.hidden = !ownerActive;
+  elements.loadSampleButton.hidden = !ownerActive;
+  elements.authForm.hidden = ownerActive;
+  elements.publicNote.hidden = ownerActive;
+  elements.setupBanner.hidden = Boolean(supabase);
+  elements.migrateLocalButton.hidden = !ownerActive || !legacyCards.length;
+
+  elements.ownerBadge.textContent = ownerActive
+    ? `Owner session: ${currentOwner.email || "Authenticated owner"}`
+    : "Public archive online";
+
+  elements.authNote.textContent = ownerActive
+    ? `Signed in as ${currentOwner.email}. Any changes you save here publish to the shared archive for all visitors.`
+    : "Owner access uses Supabase Auth. Public visitors can browse the archive without signing in.";
+
+  if (!ownerActive) {
+    resetForm();
+  }
+
+  render();
 }
 
 async function handlePhotoChange(event) {
@@ -449,11 +323,11 @@ async function handlePhotoChange(event) {
   }
 }
 
-function handleSubmit(event) {
+async function handleSubmit(event) {
   event.preventDefault();
 
-  if (!authenticated) {
-    lockApp();
+  if (!currentOwner || !supabase) {
+    setAuthFeedback("Sign in as the owner before publishing changes.", true);
     return;
   }
 
@@ -474,27 +348,37 @@ function handleSubmit(event) {
   };
 
   if (!card.title || !card.character || !card.set) {
+    setAuthFeedback("Complete the title, character, and set fields before saving.", true);
     return;
   }
 
-  const nextCards = [...cards];
-  const existingIndex = nextCards.findIndex((entry) => entry.id === card.id);
-  if (existingIndex >= 0) {
-    nextCards[existingIndex] = card;
+  const payload = toDatabasePayload(card, currentOwner.id);
+  let error;
+
+  if (elements.cardId.value) {
+    ({ error } = await supabase
+      .from(SUPABASE_TABLE)
+      .update(payload)
+      .eq("id", card.id));
   } else {
-    nextCards.unshift(card);
+    ({ error } = await supabase
+      .from(SUPABASE_TABLE)
+      .insert(payload));
   }
 
-  if (!saveCards(nextCards)) {
+  if (error) {
+    console.error("Unable to save card", error);
+    setAuthFeedback(error.message, true);
     return;
   }
 
+  setAuthFeedback("Shared archive updated successfully.");
   resetForm();
-  render();
+  await loadSharedCards();
 }
 
-function handleGridClick(event) {
-  if (!authenticated) {
+async function handleGridClick(event) {
+  if (!currentOwner || !supabase) {
     return;
   }
 
@@ -517,18 +401,25 @@ function handleGridClick(event) {
   }
 
   if (deleteButton) {
-    const confirmed = window.confirm(`Delete "${card.title}" from your archive?`);
+    const confirmed = window.confirm(`Delete "${card.title}" from the shared archive?`);
     if (!confirmed) {
       return;
     }
 
-    const nextCards = cards.filter((entry) => entry.id !== id);
-    if (!saveCards(nextCards)) {
+    const { error } = await supabase
+      .from(SUPABASE_TABLE)
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("Unable to delete card", error);
+      setAuthFeedback(error.message, true);
       return;
     }
 
+    setAuthFeedback("Record removed from the shared archive.");
     resetForm();
-    render();
+    await loadSharedCards();
   }
 }
 
@@ -649,8 +540,8 @@ function renderGrid(source) {
     const emptyState = document.createElement("div");
     emptyState.className = "empty-state";
     emptyState.innerHTML = `
-      <h3>Your archive is ready</h3>
-      <p>Add your first Naruto Kayou card or load the starter sample to see the layout in action.</p>
+      <h3>The archive is ready</h3>
+      <p>${supabase ? "No shared records are published yet." : "Configure Supabase or publish records to begin."}</p>
     `;
     elements.grid.append(emptyState);
     return;
@@ -662,6 +553,7 @@ function renderGrid(source) {
     const imageWrap = fragment.querySelector(".card-image-wrap");
     const image = fragment.querySelector(".card-image");
     const languagePill = fragment.querySelector(".language-pill");
+    const actions = fragment.querySelector(".card-actions");
 
     article.dataset.id = card.id;
     languagePill.textContent = card.language;
@@ -687,12 +579,14 @@ function renderGrid(source) {
       imageWrap.classList.add("no-image");
     }
 
+    actions.hidden = !currentOwner;
     elements.grid.append(fragment);
   });
 }
 
 function exportCards() {
-  if (!authenticated) {
+  if (!currentOwner) {
+    setAuthFeedback("Sign in as the owner before exporting the archive.", true);
     return;
   }
 
@@ -706,9 +600,10 @@ function exportCards() {
   URL.revokeObjectURL(url);
 }
 
-function importCards(event) {
-  if (!authenticated) {
+async function importCards(event) {
+  if (!currentOwner || !supabase) {
     event.target.value = "";
+    setAuthFeedback("Sign in as the owner before importing records.", true);
     return;
   }
 
@@ -718,23 +613,28 @@ function importCards(event) {
   }
 
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     try {
       const parsed = JSON.parse(reader.result);
       if (!Array.isArray(parsed)) {
         throw new Error("Imported file must contain an array of cards.");
       }
 
-      const nextCards = parsed.map(normalizeImportedCard);
-      if (!saveCards(nextCards)) {
-        return;
+      const importedCards = parsed.map(normalizeImportedCard);
+      const payload = importedCards.map((card) => toDatabasePayload(card, currentOwner.id));
+      const { error } = await supabase
+        .from(SUPABASE_TABLE)
+        .upsert(payload, { onConflict: "id" });
+
+      if (error) {
+        throw error;
       }
 
-      resetForm();
-      render();
+      setAuthFeedback("Archive import complete. Shared records were updated.");
+      await loadSharedCards();
     } catch (error) {
-      window.alert("That JSON file could not be imported.");
       console.error(error);
+      window.alert("That JSON file could not be imported into the shared archive.");
     } finally {
       event.target.value = "";
     }
@@ -743,22 +643,153 @@ function importCards(event) {
   reader.readAsText(file);
 }
 
+async function loadSampleCards() {
+  if (!currentOwner || !supabase) {
+    setAuthFeedback("Sign in as the owner before publishing sample records.", true);
+    return;
+  }
+
+  const existingKeys = new Set(cards.map((card) => archiveKey(card)));
+  const incomingSamples = SAMPLE_CARDS.filter((card) => !existingKeys.has(archiveKey(card)));
+
+  if (!incomingSamples.length) {
+    window.alert("The sample records are already in the shared archive.");
+    return;
+  }
+
+  const payload = incomingSamples.map((card) => toDatabasePayload(card, currentOwner.id));
+  const { error } = await supabase
+    .from(SUPABASE_TABLE)
+    .insert(payload);
+
+  if (error) {
+    console.error("Unable to load sample records", error);
+    setAuthFeedback(error.message, true);
+    return;
+  }
+
+  setAuthFeedback("Sample records published to the shared archive.");
+  await loadSharedCards();
+}
+
+async function publishLegacyCards() {
+  if (!currentOwner || !supabase || !legacyCards.length) {
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Publish ${legacyCards.length} browser-local card record${legacyCards.length === 1 ? "" : "s"} to the shared archive?`
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  const existingKeys = new Set(cards.map((card) => archiveKey(card)));
+  const cardsToPublish = legacyCards.filter((card) => !existingKeys.has(archiveKey(card)));
+
+  if (!cardsToPublish.length) {
+    setAuthFeedback("Your browser-local archive is already represented in the shared collection.");
+    return;
+  }
+
+  const payload = cardsToPublish.map((card) => toDatabasePayload(card, currentOwner.id));
+  const { error } = await supabase
+    .from(SUPABASE_TABLE)
+    .insert(payload);
+
+  if (error) {
+    console.error("Unable to publish browser-local archive", error);
+    setAuthFeedback(error.message, true);
+    return;
+  }
+
+  setAuthFeedback("Browser-local records published to the shared archive.");
+  await loadSharedCards();
+}
+
+function setAuthFeedback(message, isError = false) {
+  elements.authFeedback.textContent = message;
+  elements.authFeedback.classList.toggle("is-error", isError);
+}
+
+function loadLegacyCards() {
+  try {
+    const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.map(normalizeImportedCard);
+  } catch (error) {
+    console.error("Unable to load browser-local archive", error);
+    return [];
+  }
+}
+
 function normalizeImportedCard(card) {
   return {
     id: card.id || crypto.randomUUID(),
     title: String(card.title || "").trim(),
     character: String(card.character || "").trim(),
-    set: String(card.set || "").trim(),
-    number: String(card.number || "").trim(),
+    set: String(card.set || card.set_name || "").trim(),
+    number: String(card.number || card.card_number || "").trim(),
     language: normalizeLanguage(card.language),
     rarity: String(card.rarity || "Common"),
     condition: String(card.condition || "Mint"),
     copies: Number(card.copies) > 0 ? Number(card.copies) : 1,
-    acquisitionDate: String(card.acquisitionDate || ""),
-    image: String(card.image || "").trim(),
+    acquisitionDate: String(card.acquisitionDate || card.acquisition_date || ""),
+    image: String(card.image || card.image_data || "").trim(),
     notes: String(card.notes || "").trim(),
     createdAt: Number(card.createdAt) || Date.now()
   };
+}
+
+function mapRowToCard(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    character: row.character,
+    set: row.set_name || "",
+    number: row.card_number || "",
+    language: normalizeLanguage(row.language),
+    rarity: row.rarity || "Common",
+    condition: row.condition || "Mint",
+    copies: Number(row.copies) || 1,
+    acquisitionDate: row.acquisition_date || "",
+    image: row.image_data || "",
+    notes: row.notes || "",
+    createdAt: row.created_at ? Date.parse(row.created_at) : Date.now()
+  };
+}
+
+function toDatabasePayload(card, ownerId) {
+  const payload = {
+    id: card.id || crypto.randomUUID(),
+    title: card.title,
+    character: card.character,
+    set_name: card.set,
+    card_number: card.number || null,
+    language: normalizeLanguage(card.language),
+    rarity: card.rarity,
+    condition: card.condition || null,
+    copies: Number(card.copies) || 1,
+    acquisition_date: card.acquisitionDate || null,
+    image_data: card.image || null,
+    notes: card.notes || null,
+    owner_user_id: ownerId
+  };
+
+  if (card.createdAt) {
+    payload.created_at = new Date(card.createdAt).toISOString();
+  }
+
+  return payload;
 }
 
 function normalizeLanguage(language) {
@@ -778,28 +809,8 @@ function normalizeLanguage(language) {
   return "Japanese";
 }
 
-function loadSampleCards() {
-  if (!authenticated) {
-    return;
-  }
-
-  const existingKeys = new Set(cards.map((card) => sampleKey(card)));
-  const incomingSamples = SAMPLE_CARDS
-    .filter((card) => !existingKeys.has(sampleKey(card)))
-    .map((card) => ({ ...card, id: crypto.randomUUID(), createdAt: Date.now() + Math.random() }));
-
-  if (!incomingSamples.length) {
-    window.alert("The starter sample cards are already in your archive.");
-    return;
-  }
-
-  const nextCards = [...incomingSamples, ...cards];
-  if (!saveCards(nextCards)) {
-    return;
-  }
-
-  resetForm();
-  render();
+function archiveKey(card) {
+  return `${card.title}::${normalizeLanguage(card.language)}::${card.number}::${card.set}`;
 }
 
 function languageClass(language) {
@@ -833,10 +844,6 @@ function formatDate(value) {
 
 function findCreatedAt(id) {
   return cards.find((card) => card.id === id)?.createdAt || Date.now();
-}
-
-function sampleKey(card) {
-  return `${card.title}::${normalizeLanguage(card.language)}::${card.number}`;
 }
 
 function clearSelectedPhoto() {
@@ -883,9 +890,7 @@ function resizeImageFile(file) {
         canvas.width = width;
         canvas.height = height;
         context.drawImage(image, 0, 0, width, height);
-
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
-        resolve(dataUrl);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
       };
 
       image.onerror = () => reject(new Error("Selected file could not be read as an image."));

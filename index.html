@@ -6,71 +6,18 @@
   <title>Naruto Kayou Card Archive</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="auth-locked">
-  <section class="auth-screen" id="auth-screen" aria-labelledby="auth-title">
-    <div class="auth-card">
-      <p class="eyebrow">Owner Access</p>
-      <h1 class="auth-title" id="auth-title">Authorize access to the archive.</h1>
-      <p class="auth-copy" id="auth-copy">
-        Create your local owner access profile the first time you open the archive, then use it to authorize future visits.
-      </p>
-
-      <div class="auth-language-list" aria-hidden="true">
-        <span>Japanese</span>
-        <span>Chinese</span>
-        <span>English</span>
-      </div>
-
-      <form id="auth-form" class="auth-form">
-        <label class="full-width" id="auth-display-name-field">
-          Display Name
-          <input id="auth-display-name" name="displayName" type="text" placeholder="Archive Owner">
-        </label>
-
-        <label>
-          Username
-          <input id="auth-username" name="username" type="text" autocomplete="username" placeholder="Enter your username" required>
-        </label>
-
-        <label>
-          Password
-          <input id="auth-password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
-        </label>
-
-        <label class="full-width" id="auth-confirm-field">
-          Confirm Password
-          <input id="auth-confirm-password" name="confirmPassword" type="password" autocomplete="new-password" placeholder="Re-enter your password">
-        </label>
-
-        <label class="auth-check full-width">
-          <input id="auth-remember" name="remember" type="checkbox" checked>
-          <span>Keep this browser authorized</span>
-        </label>
-
-        <div class="form-actions full-width">
-          <button class="button button-primary" type="submit" id="auth-submit-button">Create owner access</button>
-          <button class="button button-ghost" type="button" id="reset-login-button">Reset saved access</button>
-        </div>
-      </form>
-
-      <p class="auth-feedback" id="auth-feedback" role="status" aria-live="polite"></p>
-      <p class="auth-note">
-        This is a browser-local sign-in for a static site and protects access on this device only.
-      </p>
-    </div>
-  </section>
-
+<body class="viewer-mode">
   <div class="page-shell">
     <header class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">Private Collection Archive</p>
-        <h1>Maintain your Naruto Kayou collection with a formal archive.</h1>
+        <p class="eyebrow">Shared Collection Archive</p>
+        <h1>Present your Naruto Kayou collection as a public archive.</h1>
         <p class="hero-text">
-          Keep Japanese, Chinese, and English editions in one structured record with controlled access,
-          fast search, collection metrics, and portable archive exports.
+          Publish Japanese, Chinese, and English editions in one shared record so visitors can browse the archive
+          while owner-only access remains reserved for collection updates and administration.
         </p>
-        <p class="owner-badge" id="owner-badge">Authorized user: Collector</p>
-        <div class="hero-actions">
+        <p class="owner-badge" id="owner-badge">Public archive online</p>
+        <div class="hero-actions" id="owner-toolbar" hidden>
           <a class="button button-primary" href="#card-form">Add record</a>
           <button class="button button-secondary" id="export-button" type="button">Export archive</button>
           <label class="button button-secondary file-button" for="import-file">Import archive</label>
@@ -109,104 +56,143 @@
     <main class="layout">
       <section class="panel form-panel">
         <div class="section-heading">
-          <p class="eyebrow">Collection Record</p>
-          <h2>Register or update a card</h2>
-          <p>Maintain separate records whenever the same artwork exists in different languages or releases.</p>
+          <p class="eyebrow">Owner Access</p>
+          <h2>Manage the public archive</h2>
+          <p>Visitors can browse the archive immediately. Sign in with your Supabase owner account to publish or update records.</p>
         </div>
 
-        <form id="card-form" class="card-form">
-          <input id="card-id" type="hidden">
+        <div class="setup-banner" id="setup-banner" hidden>
+          Shared archive setup is incomplete. Add your Supabase project URL and anon key in `supabase-config.js`, then run the SQL in `supabase-setup.sql`.
+        </div>
 
+        <div class="public-note" id="public-note">
+          The collection view is public. Management tools appear here only after owner sign-in.
+        </div>
+
+        <form id="auth-form" class="auth-form">
           <label>
-            Card Title
-            <input id="card-title" name="title" type="text" placeholder="Six Paths Naruto" required>
+            Owner Email
+            <input id="auth-email" name="email" type="email" autocomplete="email" placeholder="owner@example.com" required>
           </label>
 
           <label>
-            Character
-            <input id="card-character" name="character" type="text" placeholder="Naruto Uzumaki" required>
-          </label>
-
-          <label>
-            Set / Series
-            <input id="card-set" name="set" type="text" placeholder="Tier 4 Wave 2" required>
-          </label>
-
-          <label>
-            Card Number
-            <input id="card-number" name="number" type="text" placeholder="MR-001">
-          </label>
-
-          <label>
-            Language Version
-            <select id="card-language" name="language" required>
-              <option value="Japanese">Japanese</option>
-              <option value="Chinese">Chinese</option>
-              <option value="English">English</option>
-            </select>
-          </label>
-
-          <label>
-            Rarity
-            <select id="card-rarity" name="rarity" required>
-              <option value="Common">Common</option>
-              <option value="Rare">Rare</option>
-              <option value="Super Rare">Super Rare</option>
-              <option value="Ultra Rare">Ultra Rare</option>
-              <option value="Secret Rare">Secret Rare</option>
-              <option value="Collector Rare">Collector Rare</option>
-            </select>
-          </label>
-
-          <label>
-            Condition
-            <select id="card-condition" name="condition">
-              <option value="Mint">Mint</option>
-              <option value="Near Mint">Near Mint</option>
-              <option value="Light Play">Light Play</option>
-              <option value="Moderate Play">Moderate Play</option>
-              <option value="Heavy Play">Heavy Play</option>
-            </select>
-          </label>
-
-          <label>
-            Copies Owned
-            <input id="card-copies" name="copies" type="number" min="1" value="1" required>
-          </label>
-
-          <label>
-            Acquisition Date
-            <input id="card-date" name="date" type="date">
-          </label>
-
-          <div class="full-width photo-field">
-            <span class="field-label">Card Photo</span>
-            <div class="photo-uploader">
-              <div class="photo-preview is-empty" id="card-photo-preview-wrap">
-                <img id="card-photo-preview" class="photo-preview-image" alt="Selected card photo preview" hidden>
-                <div class="photo-preview-placeholder" id="card-photo-placeholder">No photo selected</div>
-              </div>
-              <div class="photo-actions">
-                <label class="button button-secondary file-button" for="card-photo-input">Take or Upload Photo</label>
-                <input id="card-photo-input" type="file" accept="image/*" capture="environment">
-                <button class="button button-ghost" id="remove-photo-button" type="button">Remove Photo</button>
-              </div>
-              <p class="field-note" id="card-photo-note">
-                On phones, this can open the camera. On desktop, it lets you choose an image file.
-              </p>
-            </div>
-          </div>
-
-          <label class="full-width">
-            Notes
-            <textarea id="card-notes" name="notes" rows="4" placeholder="Binder page, grading plans, trade notes, signed version, etc."></textarea>
+            Password
+            <input id="auth-password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
           </label>
 
           <div class="form-actions full-width">
-            <button class="button button-primary" type="submit" id="save-button">Save card</button>
-            <button class="button button-ghost" type="button" id="reset-button">Clear form</button>
+            <button class="button button-primary" type="submit" id="auth-submit-button">Sign in as owner</button>
+            <button class="button button-secondary" type="button" id="refresh-button">Refresh shared archive</button>
+            <button class="button button-ghost" type="button" id="migrate-local-button" hidden>Publish local archive</button>
           </div>
         </form>
+
+        <p class="auth-feedback" id="auth-feedback" role="status" aria-live="polite"></p>
+        <p class="auth-note" id="auth-note">
+          Owner access uses Supabase Auth. Public visitors can still browse the archive without signing in.
+        </p>
+
+        <div id="manager-shell" hidden>
+          <div class="section-heading manager-heading">
+            <p class="eyebrow">Collection Record</p>
+            <h2>Register or update a card</h2>
+            <p>Maintain separate records whenever the same artwork exists in different languages or releases.</p>
+          </div>
+
+          <form id="card-form" class="card-form">
+            <input id="card-id" type="hidden">
+
+            <label>
+              Card Title
+              <input id="card-title" name="title" type="text" placeholder="Six Paths Naruto" required>
+            </label>
+
+            <label>
+              Character
+              <input id="card-character" name="character" type="text" placeholder="Naruto Uzumaki" required>
+            </label>
+
+            <label>
+              Set / Series
+              <input id="card-set" name="set" type="text" placeholder="Tier 4 Wave 2" required>
+            </label>
+
+            <label>
+              Card Number
+              <input id="card-number" name="number" type="text" placeholder="MR-001">
+            </label>
+
+            <label>
+              Language Version
+              <select id="card-language" name="language" required>
+                <option value="Japanese">Japanese</option>
+                <option value="Chinese">Chinese</option>
+                <option value="English">English</option>
+              </select>
+            </label>
+
+            <label>
+              Rarity
+              <select id="card-rarity" name="rarity" required>
+                <option value="Common">Common</option>
+                <option value="Rare">Rare</option>
+                <option value="Super Rare">Super Rare</option>
+                <option value="Ultra Rare">Ultra Rare</option>
+                <option value="Secret Rare">Secret Rare</option>
+                <option value="Collector Rare">Collector Rare</option>
+              </select>
+            </label>
+
+            <label>
+              Condition
+              <select id="card-condition" name="condition">
+                <option value="Mint">Mint</option>
+                <option value="Near Mint">Near Mint</option>
+                <option value="Light Play">Light Play</option>
+                <option value="Moderate Play">Moderate Play</option>
+                <option value="Heavy Play">Heavy Play</option>
+              </select>
+            </label>
+
+            <label>
+              Copies Owned
+              <input id="card-copies" name="copies" type="number" min="1" value="1" required>
+            </label>
+
+            <label>
+              Acquisition Date
+              <input id="card-date" name="date" type="date">
+            </label>
+
+            <div class="full-width photo-field">
+              <span class="field-label">Card Photo</span>
+              <div class="photo-uploader">
+                <div class="photo-preview is-empty" id="card-photo-preview-wrap">
+                  <img id="card-photo-preview" class="photo-preview-image" alt="Selected card photo preview" hidden>
+                  <div class="photo-preview-placeholder" id="card-photo-placeholder">No photo selected</div>
+                </div>
+                <div class="photo-actions">
+                  <label class="button button-secondary file-button" for="card-photo-input">Take or Upload Photo</label>
+                  <input id="card-photo-input" type="file" accept="image/*" capture="environment">
+                  <button class="button button-ghost" id="remove-photo-button" type="button">Remove Photo</button>
+                </div>
+                <p class="field-note" id="card-photo-note">
+                  On phones, this can open the camera. On desktop, it lets you choose an image file.
+                </p>
+              </div>
+            </div>
+
+            <label class="full-width">
+              Notes
+              <textarea id="card-notes" name="notes" rows="4" placeholder="Binder page, grading plans, trade notes, signed version, etc."></textarea>
+            </label>
+
+            <div class="form-actions full-width">
+              <button class="button button-primary" type="submit" id="save-button">Save card</button>
+              <button class="button button-ghost" type="button" id="reset-button">Clear form</button>
+            </div>
+          </form>
+        </div>
       </section>
 
       <section class="panel collection-panel">
@@ -311,6 +297,8 @@
     </article>
   </template>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
