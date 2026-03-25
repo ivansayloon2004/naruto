@@ -11,6 +11,8 @@ create table if not exists public.kayou_cards (
   condition text,
   copies integer not null default 1 check (copies > 0),
   acquisition_date date,
+  purchase_price numeric(12, 2),
+  estimated_value numeric(12, 2),
   image_data text,
   notes text,
   owner_user_id uuid not null references auth.users(id) on delete cascade,
@@ -24,10 +26,24 @@ alter table public.kayou_cards
 alter table public.kayou_cards
   add column if not exists card_status text not null default 'Owned';
 
+alter table public.kayou_cards
+  add column if not exists purchase_price numeric(12, 2);
+
+alter table public.kayou_cards
+  add column if not exists estimated_value numeric(12, 2);
+
 update public.kayou_cards
 set card_status = 'Owned'
 where card_status is null
    or card_status not in ('Owned', 'Wishlist', 'For Trade');
+
+update public.kayou_cards
+set purchase_price = null
+where purchase_price < 0;
+
+update public.kayou_cards
+set estimated_value = null
+where estimated_value < 0;
 
 do $$
 begin
@@ -39,6 +55,34 @@ begin
     alter table public.kayou_cards
       add constraint kayou_cards_card_status_check
       check (card_status in ('Owned', 'Wishlist', 'For Trade'));
+  end if;
+end
+$$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'kayou_cards_purchase_price_check'
+  ) then
+    alter table public.kayou_cards
+      add constraint kayou_cards_purchase_price_check
+      check (purchase_price is null or purchase_price >= 0);
+  end if;
+end
+$$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'kayou_cards_estimated_value_check'
+  ) then
+    alter table public.kayou_cards
+      add constraint kayou_cards_estimated_value_check
+      check (estimated_value is null or estimated_value >= 0);
   end if;
 end
 $$;

@@ -50,7 +50,20 @@
             <span class="stat-title">English</span>
             <strong class="stat-value" id="en-count">0</strong>
           </article>
+          <article class="stat-card stat-card-finance">
+            <span class="stat-title">Cost Basis</span>
+            <strong class="stat-value" id="cost-basis-total">0.00</strong>
+          </article>
+          <article class="stat-card stat-card-finance">
+            <span class="stat-title">Estimated Value</span>
+            <strong class="stat-value" id="estimated-total">0.00</strong>
+          </article>
+          <article class="stat-card stat-card-finance">
+            <span class="stat-title">Value Change</span>
+            <strong class="stat-value" id="value-change-total">0.00</strong>
+          </article>
         </div>
+        <p class="panel-note">Value totals use the purchase and estimated amounts you enter for owned and trade cards. Use one currency across the archive for the clearest tracking.</p>
       </div>
     </header>
 
@@ -211,6 +224,16 @@
               <input id="card-date" name="date" type="date">
             </label>
 
+            <label>
+              Purchase Total
+              <input id="card-purchase-price" name="purchasePrice" type="number" min="0" step="0.01" placeholder="350.00">
+            </label>
+
+            <label>
+              Estimated Total
+              <input id="card-estimated-value" name="estimatedValue" type="number" min="0" step="0.01" placeholder="425.00">
+            </label>
+
             <div class="full-width photo-field">
               <span class="field-label">Card Photo</span>
               <div class="photo-uploader">
@@ -307,6 +330,7 @@
               <option value="title">Title A-Z</option>
               <option value="character">Character A-Z</option>
               <option value="rarity">Highest rarity</option>
+              <option value="estimatedValue">Highest estimated value</option>
             </select>
           </label>
         </div>
@@ -359,6 +383,14 @@
           <div>
             <dt>Added</dt>
             <dd class="detail-date"></dd>
+          </div>
+          <div>
+            <dt class="detail-purchase-label">Purchase Total</dt>
+            <dd class="detail-purchase"></dd>
+          </div>
+          <div>
+            <dt class="detail-estimate-label">Estimated Total</dt>
+            <dd class="detail-estimate"></dd>
           </div>
         </dl>
         <p class="card-notes"></p>

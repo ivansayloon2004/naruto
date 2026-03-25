@@ -587,6 +587,15 @@ h2 {
   text-transform: uppercase;
 }
 
+.panel-note {
+  position: relative;
+  z-index: 1;
+  margin: 1rem 0 0;
+  color: rgba(248, 251, 255, 0.72);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
 .stat-grid {
   position: relative;
   z-index: 1;
@@ -603,6 +612,14 @@ h2 {
   border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.06);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.stat-card-finance::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: rgba(255, 255, 255, 0.45);
 }
 
 .stat-card-language::before {
@@ -635,6 +652,14 @@ h2 {
   margin-top: 0.45rem;
   color: #f8fbff;
   font-size: clamp(1.55rem, 3vw, 2rem);
+}
+
+.stat-value.is-positive {
+  color: #d3ffe8;
+}
+
+.stat-value.is-negative {
+  color: #ffd6d2;
 }
 
 .layout {

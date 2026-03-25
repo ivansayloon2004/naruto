@@ -18,6 +18,8 @@ const SAMPLE_CARDS = [
     condition: "Near Mint",
     copies: 1,
     acquisitionDate: "2026-01-18",
+    purchasePrice: 185,
+    estimatedValue: 240,
     image: "",
     notes: "Sleeved in premium binder. Great foil pop under natural light.",
     createdAt: Date.now() - 300000
@@ -35,6 +37,8 @@ const SAMPLE_CARDS = [
     condition: "Mint",
     copies: 2,
     acquisitionDate: "2026-02-05",
+    purchasePrice: 120,
+    estimatedValue: 165,
     image: "",
     notes: "One for binder, one for trade stock.",
     createdAt: Date.now() - 200000
@@ -52,6 +56,8 @@ const SAMPLE_CARDS = [
     condition: "Near Mint",
     copies: 1,
     acquisitionDate: "2026-03-02",
+    purchasePrice: null,
+    estimatedValue: 80,
     image: "",
     notes: "Good reference card for future English set tracking.",
     createdAt: Date.now() - 100000
@@ -102,6 +108,8 @@ const elements = {
   condition: document.querySelector("#card-condition"),
   copies: document.querySelector("#card-copies"),
   date: document.querySelector("#card-date"),
+  purchasePrice: document.querySelector("#card-purchase-price"),
+  estimatedValue: document.querySelector("#card-estimated-value"),
   photoInput: document.querySelector("#card-photo-input"),
   photoPreviewWrap: document.querySelector("#card-photo-preview-wrap"),
   photoPreview: document.querySelector("#card-photo-preview"),
@@ -123,6 +131,9 @@ const elements = {
   jpCount: document.querySelector("#jp-count"),
   cnCount: document.querySelector("#cn-count"),
   enCount: document.querySelector("#en-count"),
+  costBasisTotal: document.querySelector("#cost-basis-total"),
+  estimatedTotal: document.querySelector("#estimated-total"),
+  valueChangeTotal: document.querySelector("#value-change-total"),
   ownedCount: document.querySelector("#owned-count"),
   wishlistCount: document.querySelector("#wishlist-count"),
   tradeCount: document.querySelector("#trade-count"),
@@ -536,6 +547,8 @@ async function handleSubmit(event) {
     condition: elements.condition.value,
     copies: Number(elements.copies.value) || 1,
     acquisitionDate: elements.date.value,
+    purchasePrice: parseOptionalAmount(elements.purchasePrice.value),
+    estimatedValue: parseOptionalAmount(elements.estimatedValue.value),
     image: currentCardImage,
     notes: elements.notes.value.trim(),
     createdAt: elements.cardId.value ? findCreatedAt(elements.cardId.value) : Date.now()
@@ -630,6 +643,8 @@ function populateForm(card) {
   elements.condition.value = card.condition;
   elements.copies.value = card.copies;
   elements.date.value = card.acquisitionDate || "";
+  elements.purchasePrice.value = card.purchasePrice ?? "";
+  elements.estimatedValue.value = card.estimatedValue ?? "";
   currentCardImage = card.image || "";
   updatePhotoPreview(currentCardImage, currentCardImage ? "Saved card photo loaded." : "No photo selected.");
   elements.notes.value = card.notes || "";
@@ -645,6 +660,8 @@ function resetForm() {
   elements.rarity.value = "Common";
   elements.condition.value = "Mint";
   elements.copies.value = 1;
+  elements.purchasePrice.value = "";
+  elements.estimatedValue.value = "";
   syncOwnerNameFields(resolveArchiveOwnerName() || currentOwner?.ownerName || inferOwnerNameFromEmail(currentOwner?.email));
   clearSelectedPhoto();
   elements.saveButton.textContent = "Save card";
@@ -715,6 +732,10 @@ function sortCards(source) {
       return (rarityRank[right.rarity] || 0) - (rarityRank[left.rarity] || 0);
     }
 
+    if (sortMode === "estimatedValue") {
+      return (right.estimatedValue || 0) - (left.estimatedValue || 0);
+    }
+
     return (right.createdAt || 0) - (left.createdAt || 0);
   });
 
@@ -735,6 +756,8 @@ function renderStats(source) {
   };
 
   let totalCopies = 0;
+  let totalCostBasis = 0;
+  let totalEstimatedValue = 0;
 
   source.forEach((card) => {
     const status = normalizeCardStatus(card.status);
@@ -744,6 +767,8 @@ function renderStats(source) {
   physicalCards.forEach((card) => {
     totalCopies += Number(card.copies) || 0;
     languageCounts[normalizeLanguage(card.language)] += 1;
+    totalCostBasis += Number(card.purchasePrice) || 0;
+    totalEstimatedValue += Number(card.estimatedValue) || 0;
   });
 
   elements.uniqueCount.textContent = String(physicalCards.length);
@@ -751,6 +776,12 @@ function renderStats(source) {
   elements.jpCount.textContent = String(languageCounts.Japanese);
   elements.cnCount.textContent = String(languageCounts.Chinese);
   elements.enCount.textContent = String(languageCounts.English);
+  elements.costBasisTotal.textContent = formatAmount(totalCostBasis);
+  elements.estimatedTotal.textContent = formatAmount(totalEstimatedValue);
+  const valueDelta = totalEstimatedValue - totalCostBasis;
+  elements.valueChangeTotal.textContent = formatSignedAmount(valueDelta);
+  elements.valueChangeTotal.classList.toggle("is-positive", valueDelta > 0);
+  elements.valueChangeTotal.classList.toggle("is-negative", valueDelta < 0);
   elements.ownedCount.textContent = `Owned ${statusCounts.Owned}`;
   elements.wishlistCount.textContent = `Wishlist ${statusCounts.Wishlist}`;
   elements.tradeCount.textContent = `For Trade ${statusCounts["For Trade"]}`;
@@ -855,6 +886,8 @@ function renderGrid(source) {
     const languagePill = fragment.querySelector(".language-pill");
     const actions = fragment.querySelector(".card-actions");
     const detailCopiesLabel = fragment.querySelector(".detail-copies-label");
+    const detailPurchaseLabel = fragment.querySelector(".detail-purchase-label");
+    const detailEstimateLabel = fragment.querySelector(".detail-estimate-label");
 
     article.dataset.id = card.id;
     statusPill.textContent = normalizeCardStatus(card.status);
@@ -870,8 +903,12 @@ function renderGrid(source) {
     fragment.querySelector(".detail-owner").textContent = card.ownerName || archiveOwnerName;
     fragment.querySelector(".detail-condition").textContent = card.condition || "Unknown";
     detailCopiesLabel.textContent = normalizeCardStatus(card.status) === "Wishlist" ? "Target" : "Copies";
+    detailPurchaseLabel.textContent = normalizeCardStatus(card.status) === "Wishlist" ? "Target Budget" : "Purchase Total";
+    detailEstimateLabel.textContent = normalizeCardStatus(card.status) === "Wishlist" ? "Target Value" : "Estimated Total";
     fragment.querySelector(".detail-copies").textContent = String(card.copies || 0);
     fragment.querySelector(".detail-date").textContent = formatDate(card.acquisitionDate);
+    fragment.querySelector(".detail-purchase").textContent = formatOptionalAmount(card.purchasePrice);
+    fragment.querySelector(".detail-estimate").textContent = formatOptionalAmount(card.estimatedValue);
     fragment.querySelector(".card-notes").textContent = card.notes || "";
     image.alt = `${card.title} ${card.language} card`;
 
@@ -1051,6 +1088,8 @@ function normalizeImportedCard(card) {
     condition: String(card.condition || "Mint"),
     copies: Number(card.copies) > 0 ? Number(card.copies) : 1,
     acquisitionDate: String(card.acquisitionDate || card.acquisition_date || ""),
+    purchasePrice: parseStoredAmount(card.purchasePrice ?? card.purchase_price),
+    estimatedValue: parseStoredAmount(card.estimatedValue ?? card.estimated_value),
     image: String(card.image || card.image_data || "").trim(),
     notes: String(card.notes || "").trim(),
     createdAt: Number(card.createdAt) || Date.now()
@@ -1071,6 +1110,8 @@ function mapRowToCard(row) {
     condition: row.condition || "Mint",
     copies: Number(row.copies) || 1,
     acquisitionDate: row.acquisition_date || "",
+    purchasePrice: parseStoredAmount(row.purchase_price),
+    estimatedValue: parseStoredAmount(row.estimated_value),
     image: row.image_data || "",
     notes: row.notes || "",
     createdAt: row.created_at ? Date.parse(row.created_at) : Date.now()
@@ -1102,6 +1143,8 @@ function toDatabasePayload(card, ownerId) {
     condition: card.condition || null,
     copies: Number(card.copies) || 1,
     acquisition_date: card.acquisitionDate || null,
+    purchase_price: toDatabaseAmount(card.purchasePrice),
+    estimated_value: toDatabaseAmount(card.estimatedValue),
     image_data: card.image || null,
     notes: card.notes || null,
     owner_user_id: ownerId
@@ -1152,6 +1195,33 @@ function normalizeCardStatus(status) {
   }
 
   return "Owned";
+}
+
+function parseOptionalAmount(value) {
+  if (value === "" || value === null || value === undefined) {
+    return null;
+  }
+
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount < 0) {
+    return null;
+  }
+
+  return Number(amount.toFixed(2));
+}
+
+function parseStoredAmount(value) {
+  if (value === "" || value === null || value === undefined) {
+    return null;
+  }
+
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 ? Number(amount.toFixed(2)) : null;
+}
+
+function toDatabaseAmount(value) {
+  const amount = parseStoredAmount(value);
+  return amount === null ? null : amount;
 }
 
 function archiveKey(card) {
@@ -1346,6 +1416,24 @@ function formatDate(value) {
     month: "short",
     day: "numeric"
   }).format(date);
+}
+
+function formatAmount(value) {
+  return new Intl.NumberFormat(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(Number(value) || 0);
+}
+
+function formatOptionalAmount(value) {
+  const amount = parseStoredAmount(value);
+  return amount === null ? "Not set" : formatAmount(amount);
+}
+
+function formatSignedAmount(value) {
+  const amount = Number(value) || 0;
+  const prefix = amount > 0 ? "+" : amount < 0 ? "-" : "";
+  return `${prefix}${formatAmount(Math.abs(amount))}`;
 }
 
 function findCreatedAt(id) {
