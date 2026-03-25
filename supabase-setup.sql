@@ -69,3 +69,57 @@ on public.kayou_cards
 for delete
 to authenticated
 using (auth.uid() = owner_user_id);
+
+create table if not exists public.kayou_set_targets (
+  id uuid primary key default gen_random_uuid(),
+  set_name text not null,
+  total_cards integer not null check (total_cards > 0),
+  owner_name text,
+  owner_user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  unique (owner_user_id, set_name)
+);
+
+alter table public.kayou_set_targets
+  add column if not exists owner_name text;
+
+create index if not exists kayou_set_targets_set_name_idx
+  on public.kayou_set_targets (set_name);
+
+drop trigger if exists kayou_set_targets_set_updated_at on public.kayou_set_targets;
+
+create trigger kayou_set_targets_set_updated_at
+before update on public.kayou_set_targets
+for each row
+execute function public.set_kayou_cards_updated_at();
+
+alter table public.kayou_set_targets enable row level security;
+
+drop policy if exists "Public read kayou set targets" on public.kayou_set_targets;
+create policy "Public read kayou set targets"
+on public.kayou_set_targets
+for select
+using (true);
+
+drop policy if exists "Owners insert kayou set targets" on public.kayou_set_targets;
+create policy "Owners insert kayou set targets"
+on public.kayou_set_targets
+for insert
+to authenticated
+with check (auth.uid() = owner_user_id);
+
+drop policy if exists "Owners update kayou set targets" on public.kayou_set_targets;
+create policy "Owners update kayou set targets"
+on public.kayou_set_targets
+for update
+to authenticated
+using (auth.uid() = owner_user_id)
+with check (auth.uid() = owner_user_id);
+
+drop policy if exists "Owners delete kayou set targets" on public.kayou_set_targets;
+create policy "Owners delete kayou set targets"
+on public.kayou_set_targets
+for delete
+to authenticated
+using (auth.uid() = owner_user_id);

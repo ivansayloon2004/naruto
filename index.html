@@ -99,6 +99,33 @@
 
         <div id="manager-shell" hidden>
           <div class="section-heading manager-heading">
+            <p class="eyebrow">Set Tracker</p>
+            <h2>Maintain set totals</h2>
+            <p>Set the total number of cards in each release so public visitors can see your completion progress.</p>
+          </div>
+
+          <form id="set-target-form" class="set-target-form">
+            <input id="set-target-id" type="hidden">
+
+            <label>
+              Set / Series
+              <input id="set-target-name" name="setName" type="text" placeholder="Tier 4 Wave 2" required>
+            </label>
+
+            <label>
+              Total Cards In Set
+              <input id="set-target-total" name="totalCards" type="number" min="1" placeholder="72" required>
+            </label>
+
+            <div class="form-actions full-width">
+              <button class="button button-primary" type="submit" id="set-target-save-button">Save target</button>
+              <button class="button button-ghost" type="button" id="set-target-reset-button">Clear target form</button>
+            </div>
+          </form>
+
+          <div id="set-target-list" class="set-target-list"></div>
+
+          <div class="section-heading manager-heading">
             <p class="eyebrow">Collection Record</p>
             <h2>Register or update a card</h2>
             <p>Maintain separate records whenever the same artwork exists in different languages or releases.</p>
@@ -207,6 +234,14 @@
 
       <section class="panel collection-panel">
         <div class="section-heading">
+          <p class="eyebrow">Set Completion</p>
+          <h2>Track progress by release</h2>
+          <p>Review your completion status for each Naruto Kayou set and compare owned cards against the published total.</p>
+        </div>
+
+        <div id="set-progress-grid" class="set-progress-grid" aria-live="polite"></div>
+
+        <div class="section-heading section-heading-secondary">
           <p class="eyebrow">Archive Search</p>
           <h2>Review and filter your records</h2>
           <p>Search by title, character, set, card number, language, and rarity across the archive.</p>
@@ -308,6 +343,30 @@
           <button class="button button-ghost small delete-button" type="button">Delete</button>
         </div>
       </div>
+    </article>
+  </template>
+
+  <template id="set-progress-template">
+    <article class="set-progress-card">
+      <div class="set-progress-topline">
+        <span class="set-progress-status"></span>
+        <span class="set-progress-percent"></span>
+      </div>
+      <h3 class="set-progress-title"></h3>
+      <p class="set-progress-owner"></p>
+      <div class="set-progress-bar" aria-hidden="true">
+        <span class="set-progress-fill"></span>
+      </div>
+      <dl class="set-progress-stats">
+        <div>
+          <dt>Owned</dt>
+          <dd class="set-progress-owned"></dd>
+        </div>
+        <div>
+          <dt>Total</dt>
+          <dd class="set-progress-total"></dd>
+        </div>
+      </dl>
     </article>
   </template>
 

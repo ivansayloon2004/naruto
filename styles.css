@@ -239,7 +239,8 @@ h2 {
 }
 
 .auth-form,
-.card-form {
+.card-form,
+.set-target-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
@@ -251,6 +252,7 @@ h2 {
 
 .auth-form label,
 .card-form label,
+.set-target-form label,
 .toolbar-item {
   display: flex;
   flex-direction: column;
@@ -266,6 +268,7 @@ h2 {
 .card-form input,
 .card-form select,
 .card-form textarea,
+.set-target-form input,
 .toolbar input,
 .toolbar select {
   width: 100%;
@@ -285,6 +288,7 @@ h2 {
 .card-form input:focus,
 .card-form select:focus,
 .card-form textarea:focus,
+.set-target-form input:focus,
 .toolbar input:focus,
 .toolbar select:focus {
   border-color: var(--accent);
@@ -518,6 +522,42 @@ h2 {
   margin-top: 1.35rem;
 }
 
+.set-target-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.set-target-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+}
+
+.set-target-copy {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.set-target-copy strong {
+  font-size: 1rem;
+}
+
+.set-target-copy span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.set-target-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
 .manager-heading {
   padding-top: 0.15rem;
 }
@@ -604,6 +644,124 @@ h2 {
 .section-heading {
   padding-bottom: 1rem;
   border-bottom: 1px solid var(--line);
+}
+
+.section-heading-secondary {
+  margin-top: 1.75rem;
+}
+
+.set-progress-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+  margin-top: 1.35rem;
+}
+
+.set-progress-card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-soft);
+}
+
+.set-progress-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.set-progress-status,
+.set-progress-percent {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.9rem;
+  padding: 0.28rem 0.7rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.set-progress-status {
+  background: var(--surface-muted);
+  color: var(--accent-dark);
+}
+
+.set-progress-status.is-complete {
+  background: rgba(2, 122, 72, 0.14);
+  color: #05603a;
+}
+
+.set-progress-status.is-in-progress {
+  background: rgba(22, 59, 99, 0.1);
+  color: var(--accent-dark);
+}
+
+.set-progress-status.is-untracked {
+  background: rgba(102, 112, 133, 0.12);
+  color: var(--muted);
+}
+
+.set-progress-percent {
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+}
+
+.set-progress-title {
+  font-size: 1.18rem;
+  line-height: 1.12;
+}
+
+.set-progress-owner {
+  margin: -0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+
+.set-progress-bar {
+  overflow: hidden;
+  height: 0.7rem;
+  border-radius: var(--radius-sm);
+  background: #e6ebf2;
+}
+
+.set-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), #3b6ea3);
+  width: 0;
+}
+
+.set-progress-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.set-progress-stats div {
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-muted);
+}
+
+.set-progress-stats dt {
+  margin: 0;
+  color: var(--muted-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.set-progress-stats dd {
+  margin: 0.25rem 0 0;
+  font-weight: 700;
 }
 
 .toolbar {
@@ -828,11 +986,17 @@ h2 {
 
   .auth-form,
   .card-form,
+  .set-target-form,
   .toolbar {
     grid-template-columns: 1fr;
   }
 
   .collection-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .set-target-item {
     flex-direction: column;
     align-items: flex-start;
   }

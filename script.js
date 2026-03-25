@@ -1,5 +1,6 @@
 const LEGACY_STORAGE_KEY = "naruto-kayou-card-archive-v1";
 const SUPABASE_TABLE = "kayou_cards";
+const SUPABASE_SET_TABLE = "kayou_set_targets";
 
 const SAMPLE_CARDS = [
   {
@@ -77,6 +78,12 @@ const elements = {
   migrateLocalButton: document.querySelector("#migrate-local-button"),
   managerShell: document.querySelector("#manager-shell"),
   logoutButton: document.querySelector("#logout-button"),
+  setTargetForm: document.querySelector("#set-target-form"),
+  setTargetId: document.querySelector("#set-target-id"),
+  setTargetName: document.querySelector("#set-target-name"),
+  setTargetTotal: document.querySelector("#set-target-total"),
+  setTargetResetButton: document.querySelector("#set-target-reset-button"),
+  setTargetList: document.querySelector("#set-target-list"),
   form: document.querySelector("#card-form"),
   cardId: document.querySelector("#card-id"),
   ownerName: document.querySelector("#card-owner-name"),
@@ -100,6 +107,8 @@ const elements = {
   filterLanguage: document.querySelector("#filter-language"),
   filterRarity: document.querySelector("#filter-rarity"),
   sort: document.querySelector("#sort-select"),
+  setProgressGrid: document.querySelector("#set-progress-grid"),
+  setProgressTemplate: document.querySelector("#set-progress-template"),
   grid: document.querySelector("#collection-grid"),
   template: document.querySelector("#card-template"),
   uniqueCount: document.querySelector("#unique-count"),
@@ -123,6 +132,7 @@ const supabase = hasSupabaseConfig
   : null;
 
 let cards = [];
+let setTargets = [];
 let legacyCards = loadLegacyCards();
 let currentOwner = null;
 let currentCardImage = "";
@@ -141,6 +151,13 @@ function bindEventListeners() {
   });
   elements.logoutButton.addEventListener("click", () => {
     void handleLogout();
+  });
+  elements.setTargetForm.addEventListener("submit", (event) => {
+    void handleSetTargetSubmit(event);
+  });
+  elements.setTargetResetButton.addEventListener("click", resetSetTargetForm);
+  elements.setTargetList.addEventListener("click", (event) => {
+    void handleSetTargetListClick(event);
   });
   elements.form.addEventListener("submit", handleSubmit);
   elements.resetButton.addEventListener("click", resetForm);
@@ -189,7 +206,8 @@ async function initializeApp() {
 
   currentOwner = data?.session?.user || null;
   updateOwnerUI();
-  await loadSharedCards();
+  await Promise.all([loadSharedCards(), loadSetTargets()]);
+  updateOwnerUI();
 }
 
 async function loadSharedCards() {
@@ -218,8 +236,40 @@ async function loadSharedCards() {
   }
 
   cards = (data || []).map(mapRowToCard);
+  if (currentOwner && !currentOwner.ownerName) {
+    currentOwner.ownerName = resolveArchiveOwnerName();
+  }
   if (!currentOwner) {
     setAuthFeedback("");
+  }
+  render();
+}
+
+async function loadSetTargets() {
+  if (!supabase) {
+    setTargets = [];
+    render();
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from(SUPABASE_SET_TABLE)
+    .select("*")
+    .order("set_name", { ascending: true });
+
+  if (error) {
+    console.error("Unable to load set tracker targets", error);
+    setAuthFeedback(
+      "Set tracker targets could not be loaded. Confirm the Supabase setup SQL has been run.",
+      true
+    );
+    render();
+    return;
+  }
+
+  setTargets = (data || []).map(mapSetTargetRow);
+  if (currentOwner && !currentOwner.ownerName) {
+    currentOwner.ownerName = resolveArchiveOwnerName();
   }
   render();
 }
@@ -258,7 +308,8 @@ async function handleAuthSubmit(event) {
   elements.authForm.reset();
   updateOwnerUI();
   setAuthFeedback("Owner access granted. Management tools are now available.");
-  await loadSharedCards();
+  await Promise.all([loadSharedCards(), loadSetTargets()]);
+  updateOwnerUI();
 }
 
 async function handleLogout() {
@@ -304,11 +355,108 @@ function updateOwnerUI() {
 
   if (!ownerActive) {
     resetForm();
+    resetSetTargetForm();
   } else {
     syncOwnerNameFields(resolveArchiveOwnerName() || currentOwner.ownerName || inferOwnerNameFromEmail(currentOwner.email));
   }
 
   render();
+}
+
+async function handleSetTargetSubmit(event) {
+  event.preventDefault();
+
+  if (!currentOwner || !supabase) {
+    setAuthFeedback("Sign in as the owner before saving set tracker totals.", true);
+    return;
+  }
+
+  const setName = elements.setTargetName.value.trim();
+  const totalCards = Number(elements.setTargetTotal.value);
+  const targetId = elements.setTargetId.value;
+
+  if (!setName || !Number.isFinite(totalCards) || totalCards < 1) {
+    setAuthFeedback("Enter the set name and a valid total card count.", true);
+    return;
+  }
+
+  const payload = toSetTargetPayload({
+    id: targetId || crypto.randomUUID(),
+    setName,
+    totalCards
+  }, currentOwner.id);
+
+  let error;
+
+  if (targetId) {
+    ({ error } = await supabase
+      .from(SUPABASE_SET_TABLE)
+      .update(payload)
+      .eq("id", targetId));
+  } else {
+    ({ error } = await supabase
+      .from(SUPABASE_SET_TABLE)
+      .insert(payload));
+  }
+
+  if (error) {
+    console.error("Unable to save set target", error);
+    setAuthFeedback(error.message, true);
+    return;
+  }
+
+  setAuthFeedback("Set tracker target saved.");
+  resetSetTargetForm();
+  await loadSetTargets();
+}
+
+async function handleSetTargetListClick(event) {
+  if (!currentOwner || !supabase) {
+    return;
+  }
+
+  const editButton = event.target.closest(".set-target-edit");
+  const deleteButton = event.target.closest(".set-target-delete");
+  const item = event.target.closest(".set-target-item");
+
+  if (!item) {
+    return;
+  }
+
+  const { id } = item.dataset;
+  const target = setTargets.find((entry) => entry.id === id);
+  if (!target) {
+    return;
+  }
+
+  if (editButton) {
+    elements.setTargetId.value = target.id;
+    elements.setTargetName.value = target.setName;
+    elements.setTargetTotal.value = target.totalCards;
+    elements.setTargetName.focus();
+  }
+
+  if (deleteButton) {
+    const confirmed = window.confirm(`Delete the set tracker target for "${target.setName}"?`);
+    if (!confirmed) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from(SUPABASE_SET_TABLE)
+      .delete()
+      .eq("id", target.id);
+
+    if (error) {
+      console.error("Unable to delete set target", error);
+      setAuthFeedback(error.message, true);
+      return;
+    }
+
+    setAuthFeedback("Set tracker target removed.");
+    resetSetTargetForm();
+    await loadSetTargets();
+  }
 }
 
 async function handlePhotoChange(event) {
@@ -468,9 +616,16 @@ function resetForm() {
   elements.saveButton.textContent = "Save card";
 }
 
+function resetSetTargetForm() {
+  elements.setTargetForm.reset();
+  elements.setTargetId.value = "";
+}
+
 function render() {
   const visibleCards = sortCards(filterCards(cards));
   renderStats(cards);
+  renderSetProgress();
+  renderSetTargetList();
   renderGrid(visibleCards);
   elements.resultsCount.textContent = `${visibleCards.length} card${visibleCards.length === 1 ? "" : "s"} shown`;
 }
@@ -547,6 +702,81 @@ function renderStats(source) {
   elements.jpCount.textContent = String(languageCounts.Japanese);
   elements.cnCount.textContent = String(languageCounts.Chinese);
   elements.enCount.textContent = String(languageCounts.English);
+}
+
+function renderSetProgress() {
+  elements.setProgressGrid.innerHTML = "";
+
+  const progressEntries = buildSetProgressEntries();
+  if (!progressEntries.length) {
+    const emptyState = document.createElement("div");
+    emptyState.className = "empty-state";
+    emptyState.innerHTML = `
+      <h3>No set progress published yet</h3>
+      <p>Owner-managed set totals will appear here once they are added to the archive.</p>
+    `;
+    elements.setProgressGrid.append(emptyState);
+    return;
+  }
+
+  progressEntries.forEach((entry) => {
+    const fragment = elements.setProgressTemplate.content.cloneNode(true);
+    const status = fragment.querySelector(".set-progress-status");
+    const fill = fragment.querySelector(".set-progress-fill");
+
+    status.textContent = entry.statusLabel;
+    status.classList.add(entry.statusClass);
+    fragment.querySelector(".set-progress-percent").textContent = entry.percentLabel;
+    fragment.querySelector(".set-progress-title").textContent = entry.setName;
+    fragment.querySelector(".set-progress-owner").textContent = `Owner: ${entry.ownerName}`;
+    fragment.querySelector(".set-progress-owned").textContent = String(entry.ownedCards);
+    fragment.querySelector(".set-progress-total").textContent = entry.totalCards ? String(entry.totalCards) : "Not set";
+    fill.style.width = `${entry.percent}%`;
+    elements.setProgressGrid.append(fragment);
+  });
+}
+
+function renderSetTargetList() {
+  elements.setTargetList.innerHTML = "";
+
+  if (!currentOwner) {
+    return;
+  }
+
+  if (!setTargets.length) {
+    const empty = document.createElement("div");
+    empty.className = "public-note";
+    empty.textContent = "No set totals have been published yet. Add your first set target above.";
+    elements.setTargetList.append(empty);
+    return;
+  }
+
+  const progressBySet = new Map(buildSetProgressEntries().map((entry) => [entry.setName, entry]));
+
+  setTargets
+    .slice()
+    .sort((left, right) => left.setName.localeCompare(right.setName))
+    .forEach((target) => {
+      const item = document.createElement("div");
+      item.className = "set-target-item";
+      item.dataset.id = target.id;
+
+      const progress = progressBySet.get(target.setName);
+      const ownedCards = progress?.ownedCards ?? 0;
+
+      item.innerHTML = `
+        <div class="set-target-copy">
+          <strong>${escapeHtml(target.setName)}</strong>
+          <span>${ownedCards} owned out of ${target.totalCards} total cards</span>
+        </div>
+        <div class="set-target-actions">
+          <button class="button button-secondary small set-target-edit" type="button">Edit</button>
+          <button class="button button-ghost small set-target-delete" type="button">Delete</button>
+        </div>
+      `;
+
+      elements.setTargetList.append(item);
+    });
 }
 
 function renderGrid(source) {
@@ -788,6 +1018,17 @@ function mapRowToCard(row) {
   };
 }
 
+function mapSetTargetRow(row) {
+  return {
+    id: row.id,
+    setName: row.set_name,
+    totalCards: Number(row.total_cards) || 0,
+    ownerName: row.owner_name || "",
+    ownerUserId: row.owner_user_id || "",
+    createdAt: row.created_at ? Date.parse(row.created_at) : Date.now()
+  };
+}
+
 function toDatabasePayload(card, ownerId) {
   const payload = {
     id: card.id || crypto.randomUUID(),
@@ -813,6 +1054,16 @@ function toDatabasePayload(card, ownerId) {
   return payload;
 }
 
+function toSetTargetPayload(target, ownerId) {
+  return {
+    id: target.id || crypto.randomUUID(),
+    set_name: target.setName,
+    total_cards: Number(target.totalCards) || 0,
+    owner_name: resolveArchiveOwnerName() || currentOwner?.ownerName || inferOwnerNameFromEmail(currentOwner?.email),
+    owner_user_id: ownerId
+  };
+}
+
 function normalizeLanguage(language) {
   const value = String(language || "").toLowerCase();
   if (value === "japanese") {
@@ -834,10 +1085,79 @@ function archiveKey(card) {
   return `${card.title}::${normalizeLanguage(card.language)}::${card.number}::${card.set}`;
 }
 
+function buildSetProgressEntries() {
+  const groups = new Map();
+
+  cards.forEach((card) => {
+    const key = card.set || "Unassigned Set";
+    const entry = groups.get(key) || {
+      setName: key,
+      ownedCards: 0,
+      ownerName: card.ownerName || resolveArchiveOwnerName() || "Archive Owner",
+      totalCards: 0
+    };
+
+    entry.ownedCards += 1;
+    if (!entry.ownerName && card.ownerName) {
+      entry.ownerName = card.ownerName;
+    }
+    groups.set(key, entry);
+  });
+
+  setTargets.forEach((target) => {
+    const entry = groups.get(target.setName) || {
+      setName: target.setName,
+      ownedCards: 0,
+      ownerName: target.ownerName || resolveArchiveOwnerName() || "Archive Owner",
+      totalCards: 0
+    };
+
+    entry.totalCards = target.totalCards;
+    if (!entry.ownerName && target.ownerName) {
+      entry.ownerName = target.ownerName;
+    }
+    groups.set(target.setName, entry);
+  });
+
+  return [...groups.values()]
+    .map((entry) => {
+      const percent = entry.totalCards > 0
+        ? Math.min(100, Math.round((entry.ownedCards / entry.totalCards) * 100))
+        : 0;
+
+      let statusLabel = "Untracked";
+      let statusClass = "is-untracked";
+      if (entry.totalCards > 0 && entry.ownedCards >= entry.totalCards) {
+        statusLabel = "Complete";
+        statusClass = "is-complete";
+      } else if (entry.totalCards > 0) {
+        statusLabel = "In Progress";
+        statusClass = "is-in-progress";
+      }
+
+      return {
+        ...entry,
+        ownerName: entry.ownerName || resolveArchiveOwnerName() || "Archive Owner",
+        percent,
+        percentLabel: entry.totalCards > 0 ? `${percent}%` : "Target pending",
+        statusLabel,
+        statusClass
+      };
+    })
+    .sort((left, right) => left.setName.localeCompare(right.setName));
+}
+
 function resolveArchiveOwnerName() {
   const ownerNames = cards
     .map((card) => String(card.ownerName || "").trim())
     .filter(Boolean);
+
+  setTargets.forEach((target) => {
+    const name = String(target.ownerName || "").trim();
+    if (name) {
+      ownerNames.push(name);
+    }
+  });
 
   if (currentOwner?.ownerName) {
     ownerNames.unshift(currentOwner.ownerName);
@@ -873,6 +1193,15 @@ function inferOwnerNameFromEmail(email) {
   }
 
   return localPart.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function languageClass(language) {
