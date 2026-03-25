@@ -82,7 +82,7 @@
         </div>
 
         <div class="setup-banner" id="setup-banner" hidden>
-          Shared archive setup is incomplete. Add your Supabase project URL and anon key in `supabase-config.js`, then run the SQL in `supabase-setup.sql`.
+          Shared archive setup is incomplete. Add `SUPABASE_URL` and `SUPABASE_ANON_KEY` to the web service environment, then run the SQL in `supabase-setup.sql`.
         </div>
 
         <div id="auth-shell">
@@ -113,7 +113,7 @@
             </div>
           </form>
           <p class="auth-note" id="auth-note">
-            Owner access uses Supabase Auth. Public visitors can still browse the archive without signing in.
+            Owner access now runs through the web service using Supabase Auth. Public visitors can still browse the archive without signing in.
           </p>
         </div>
 
@@ -453,8 +453,6 @@
     </article>
   </template>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-config.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

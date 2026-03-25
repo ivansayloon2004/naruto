@@ -1,12 +1,14 @@
 services:
   - type: web
     name: naruto-kayou-card-archive
-    runtime: static
-    buildCommand: "true"
-    staticPublishPath: ./
+    runtime: node
+    buildCommand: "npm install"
+    startCommand: "npm start"
     envVars:
-      - key: SKIP_INSTALL_DEPS
-        value: "true"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
     headers:
       - path: /*
         name: X-Frame-Options

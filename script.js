@@ -1,8 +1,7 @@
 const LEGACY_STORAGE_KEY = "naruto-kayou-card-archive-v1";
-const SUPABASE_TABLE = "kayou_cards";
-const SUPABASE_SET_TABLE = "kayou_set_targets";
 const CARD_STATUSES = ["Owned", "Wishlist", "For Trade"];
 const PHYSICAL_CARD_STATUSES = new Set(["Owned", "For Trade"]);
+const API_BASE = "/api";
 
 const SAMPLE_CARDS = [
   {
@@ -154,23 +153,66 @@ const elements = {
   loadSampleButton: document.querySelector("#load-sample-button")
 };
 
-const config = window.SUPABASE_CONFIG || {};
-const hasSupabaseClient = Boolean(window.supabase && typeof window.supabase.createClient === "function");
-const hasSupabaseConfig = Boolean(config.url && config.anonKey && hasSupabaseClient);
-const supabase = hasSupabaseConfig
-  ? window.supabase.createClient(config.url, config.anonKey)
-  : null;
-
 let cards = [];
 let setTargets = [];
 let legacyCards = loadLegacyCards();
 let currentOwner = null;
 let currentCardImage = "";
 let selectedStatusFilter = "All";
+let serviceConfigured = true;
 
 bindEventListeners();
 updatePhotoPreview("", "No photo selected. On phones, this can open the camera. On desktop, it lets you choose an image file.");
 initializeApp();
+
+async function apiRequest(path, options = {}) {
+  const requestOptions = {
+    method: options.method || "GET",
+    credentials: "same-origin",
+    headers: {}
+  };
+
+  if (options.body !== undefined) {
+    requestOptions.headers["Content-Type"] = "application/json";
+    requestOptions.body = JSON.stringify(options.body);
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, requestOptions);
+  const rawBody = await response.text();
+  const payload = rawBody ? parseApiPayload(rawBody) : null;
+
+  if (!response.ok) {
+    const error = new Error(readApiError(payload, response.statusText));
+    error.status = response.status;
+    if (response.status === 401) {
+      currentOwner = null;
+      updateOwnerUI();
+    }
+    throw error;
+  }
+
+  return payload;
+}
+
+function parseApiPayload(rawBody) {
+  try {
+    return JSON.parse(rawBody);
+  } catch (error) {
+    return rawBody;
+  }
+}
+
+function readApiError(payload, fallback) {
+  if (payload && typeof payload === "object" && typeof payload.error === "string" && payload.error.trim()) {
+    return payload.error;
+  }
+
+  if (typeof payload === "string" && payload.trim()) {
+    return payload;
+  }
+
+  return fallback || "The web service request failed.";
+}
 
 function bindEventListeners() {
   elements.authForm.addEventListener("submit", handleAuthSubmit);
@@ -230,107 +272,98 @@ function handleStatusTabClick(event) {
 }
 
 async function initializeApp() {
-  elements.authSubmitButton.disabled = !supabase;
+  elements.authSubmitButton.disabled = true;
   elements.authOwnerName.value = inferOwnerNameFromEmail("");
   updateOwnerUI();
   render();
 
-  if (!supabase) {
+  try {
+    const session = await apiRequest("/auth/session");
+    serviceConfigured = session?.configured !== false;
+    currentOwner = session?.authenticated ? session.user : null;
+  } catch (error) {
+    console.error("Unable to reach the web service", error);
+    serviceConfigured = false;
+    currentOwner = null;
+  }
+
+  elements.authSubmitButton.disabled = !serviceConfigured;
+  updateOwnerUI();
+
+  if (!serviceConfigured) {
     elements.setupBanner.hidden = false;
     cards = legacyCards;
     setAuthFeedback(
-      "Supabase is not configured yet. The page is only showing browser-local records on this device until shared storage is connected.",
+      "The web service is not configured yet. The page is only showing browser-local records on this device until shared storage is connected.",
       true
     );
     render();
     return;
   }
 
-  supabase.auth.onAuthStateChange((_event, session) => {
-    currentOwner = session?.user || null;
-    updateOwnerUI();
-  });
-
-  const { data, error } = await supabase.auth.getSession();
-  if (error) {
-    console.error("Unable to restore owner session", error);
-  }
-
-  currentOwner = data?.session?.user || null;
-  updateOwnerUI();
   await Promise.all([loadSharedCards(), loadSetTargets()]);
   updateOwnerUI();
 }
 
 async function loadSharedCards() {
-  if (!supabase) {
+  if (!serviceConfigured) {
     cards = legacyCards;
     render();
     return;
   }
 
-  const { data, error } = await supabase
-    .from(SUPABASE_TABLE)
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) {
+  try {
+    const data = await apiRequest("/cards");
+    cards = (data?.cards || []).map(mapRowToCard);
+    if (currentOwner && !currentOwner.ownerName) {
+      currentOwner.ownerName = resolveArchiveOwnerName();
+    }
+    if (!currentOwner) {
+      setAuthFeedback("");
+    }
+    render();
+  } catch (error) {
     console.error("Unable to load shared archive", error);
     if (!cards.length && legacyCards.length) {
       cards = legacyCards;
     }
     setAuthFeedback(
-      "The shared archive could not be loaded. Confirm the Supabase table, policies, and config values.",
+      error.message || "The shared archive could not be loaded. Confirm the web service and Supabase configuration.",
       true
     );
     render();
-    return;
   }
-
-  cards = (data || []).map(mapRowToCard);
-  if (currentOwner && !currentOwner.ownerName) {
-    currentOwner.ownerName = resolveArchiveOwnerName();
-  }
-  if (!currentOwner) {
-    setAuthFeedback("");
-  }
-  render();
 }
 
 async function loadSetTargets() {
-  if (!supabase) {
+  if (!serviceConfigured) {
     setTargets = [];
     render();
     return;
   }
 
-  const { data, error } = await supabase
-    .from(SUPABASE_SET_TABLE)
-    .select("*")
-    .order("set_name", { ascending: true });
-
-  if (error) {
+  try {
+    const data = await apiRequest("/set-targets");
+    setTargets = (data?.setTargets || []).map(mapSetTargetRow);
+    if (currentOwner && !currentOwner.ownerName) {
+      currentOwner.ownerName = resolveArchiveOwnerName();
+    }
+    render();
+  } catch (error) {
     console.error("Unable to load set tracker targets", error);
     setAuthFeedback(
-      "Set tracker targets could not be loaded. Confirm the Supabase setup SQL has been run.",
+      error.message || "Set tracker targets could not be loaded. Confirm the web service and Supabase setup SQL.",
       true
     );
     render();
-    return;
   }
-
-  setTargets = (data || []).map(mapSetTargetRow);
-  if (currentOwner && !currentOwner.ownerName) {
-    currentOwner.ownerName = resolveArchiveOwnerName();
-  }
-  render();
 }
 
 async function handleAuthSubmit(event) {
   event.preventDefault();
 
-  if (!supabase) {
-    setAuthFeedback("Add your Supabase project values in supabase-config.js before signing in.", true);
+  if (!serviceConfigured) {
+    setAuthFeedback("Add SUPABASE_URL and SUPABASE_ANON_KEY to the web service before signing in.", true);
     return;
   }
 
@@ -345,40 +378,43 @@ async function handleAuthSubmit(event) {
 
   setAuthFeedback("Authorizing owner access...");
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password
-  });
+  try {
+    const data = await apiRequest("/auth/login", {
+      method: "POST",
+      body: {
+        ownerName,
+        email,
+        password
+      }
+    });
 
-  if (error) {
+    currentOwner = data?.user || null;
+    elements.authForm.reset();
+    updateOwnerUI();
+    setAuthFeedback("Owner access granted. Management tools are now available.");
+    await Promise.all([loadSharedCards(), loadSetTargets()]);
+    updateOwnerUI();
+    revealOwnerDashboard();
+  } catch (error) {
     setAuthFeedback(error.message, true);
-    return;
   }
-
-  currentOwner = data?.user || data?.session?.user || null;
-  currentOwner.ownerName = ownerName;
-  elements.authForm.reset();
-  updateOwnerUI();
-  setAuthFeedback("Owner access granted. Management tools are now available.");
-  await Promise.all([loadSharedCards(), loadSetTargets()]);
-  updateOwnerUI();
-  revealOwnerDashboard();
 }
 
 async function handleLogout() {
-  if (!supabase) {
+  if (!serviceConfigured) {
     return;
   }
 
-  const { error } = await supabase.auth.signOut();
-  if (error) {
+  try {
+    await apiRequest("/auth/logout", {
+      method: "POST"
+    });
+    currentOwner = null;
+    updateOwnerUI();
+    setAuthFeedback("Signed out. The archive remains visible to all visitors.");
+  } catch (error) {
     setAuthFeedback(error.message, true);
-    return;
   }
-
-  currentOwner = null;
-  updateOwnerUI();
-  setAuthFeedback("Signed out. The archive remains visible to all visitors.");
 }
 
 function updateOwnerUI() {
@@ -394,8 +430,8 @@ function updateOwnerUI() {
   elements.managerShell.hidden = !ownerActive;
   elements.loadSampleButton.hidden = !ownerActive;
   elements.authShell.hidden = ownerActive;
-  elements.setupBanner.hidden = Boolean(supabase);
-  elements.migrateLocalButton.hidden = !ownerActive || !legacyCards.length;
+  elements.setupBanner.hidden = serviceConfigured;
+  elements.migrateLocalButton.hidden = !ownerActive || !legacyCards.length || !serviceConfigured;
 
   if (!ownerActive) {
     resetForm();
@@ -422,7 +458,7 @@ function revealOwnerDashboard() {
 async function handleSetTargetSubmit(event) {
   event.preventDefault();
 
-  if (!currentOwner || !supabase) {
+  if (!currentOwner || !serviceConfigured) {
     setAuthFeedback("Sign in as the owner before saving set tracker totals.", true);
     return;
   }
@@ -442,32 +478,30 @@ async function handleSetTargetSubmit(event) {
     totalCards
   }, currentOwner.id);
 
-  let error;
+  try {
+    if (targetId) {
+      await apiRequest(`/set-targets/${encodeURIComponent(targetId)}`, {
+        method: "PUT",
+        body: payload
+      });
+    } else {
+      await apiRequest("/set-targets", {
+        method: "POST",
+        body: payload
+      });
+    }
 
-  if (targetId) {
-    ({ error } = await supabase
-      .from(SUPABASE_SET_TABLE)
-      .update(payload)
-      .eq("id", targetId));
-  } else {
-    ({ error } = await supabase
-      .from(SUPABASE_SET_TABLE)
-      .insert(payload));
-  }
-
-  if (error) {
+    setAuthFeedback("Set tracker target saved.");
+    resetSetTargetForm();
+    await loadSetTargets();
+  } catch (error) {
     console.error("Unable to save set target", error);
     setAuthFeedback(error.message, true);
-    return;
   }
-
-  setAuthFeedback("Set tracker target saved.");
-  resetSetTargetForm();
-  await loadSetTargets();
 }
 
 async function handleSetTargetListClick(event) {
-  if (!currentOwner || !supabase) {
+  if (!currentOwner || !serviceConfigured) {
     return;
   }
 
@@ -498,20 +532,17 @@ async function handleSetTargetListClick(event) {
       return;
     }
 
-    const { error } = await supabase
-      .from(SUPABASE_SET_TABLE)
-      .delete()
-      .eq("id", target.id);
-
-    if (error) {
+    try {
+      await apiRequest(`/set-targets/${encodeURIComponent(target.id)}`, {
+        method: "DELETE"
+      });
+      setAuthFeedback("Set tracker target removed.");
+      resetSetTargetForm();
+      await loadSetTargets();
+    } catch (error) {
       console.error("Unable to delete set target", error);
       setAuthFeedback(error.message, true);
-      return;
     }
-
-    setAuthFeedback("Set tracker target removed.");
-    resetSetTargetForm();
-    await loadSetTargets();
   }
 }
 
@@ -543,7 +574,7 @@ async function handlePhotoChange(event) {
 async function handleSubmit(event) {
   event.preventDefault();
 
-  if (!currentOwner || !supabase) {
+  if (!currentOwner || !serviceConfigured) {
     setAuthFeedback("Sign in as the owner before publishing changes.", true);
     return;
   }
@@ -580,28 +611,27 @@ async function handleSubmit(event) {
   }
 
   const payload = toDatabasePayload(card, currentOwner.id);
-  let error;
 
-  if (elements.cardId.value) {
-    ({ error } = await supabase
-      .from(SUPABASE_TABLE)
-      .update(payload)
-      .eq("id", card.id));
-  } else {
-    ({ error } = await supabase
-      .from(SUPABASE_TABLE)
-      .insert(payload));
-  }
+  try {
+    if (elements.cardId.value) {
+      await apiRequest(`/cards/${encodeURIComponent(card.id)}`, {
+        method: "PUT",
+        body: payload
+      });
+    } else {
+      await apiRequest("/cards", {
+        method: "POST",
+        body: payload
+      });
+    }
 
-  if (error) {
+    setAuthFeedback("Shared archive updated successfully.");
+    resetForm();
+    await loadSharedCards();
+  } catch (error) {
     console.error("Unable to save card", error);
     setAuthFeedback(error.message, true);
-    return;
   }
-
-  setAuthFeedback("Shared archive updated successfully.");
-  resetForm();
-  await loadSharedCards();
 }
 
 async function handleGridClick(event) {
@@ -625,7 +655,7 @@ async function handleGridClick(event) {
     return;
   }
 
-  if (!currentOwner || !supabase) {
+  if (!currentOwner || !serviceConfigured) {
     return;
   }
 
@@ -639,20 +669,17 @@ async function handleGridClick(event) {
       return;
     }
 
-    const { error } = await supabase
-      .from(SUPABASE_TABLE)
-      .delete()
-      .eq("id", id);
-
-    if (error) {
+    try {
+      await apiRequest(`/cards/${encodeURIComponent(id)}`, {
+        method: "DELETE"
+      });
+      setAuthFeedback("Record removed from the shared archive.");
+      resetForm();
+      await loadSharedCards();
+    } catch (error) {
       console.error("Unable to delete card", error);
       setAuthFeedback(error.message, true);
-      return;
     }
-
-    setAuthFeedback("Record removed from the shared archive.");
-    resetForm();
-    await loadSharedCards();
   }
 }
 
@@ -945,7 +972,7 @@ function renderGrid(source) {
     emptyState.className = "empty-state";
     emptyState.innerHTML = `
       <h3>${selectedStatusFilter === "All" ? "The archive is ready" : `No ${selectedStatusFilter} records found`}</h3>
-      <p>${supabase ? emptyStateMessageForStatus() : "Configure Supabase or publish records to begin."}</p>
+      <p>${serviceConfigured ? emptyStateMessageForStatus() : "Configure the web service or publish records to begin."}</p>
     `;
     elements.grid.append(emptyState);
     return;
@@ -1025,7 +1052,7 @@ function exportCards() {
 }
 
 async function importCards(event) {
-  if (!currentOwner || !supabase) {
+  if (!currentOwner || !serviceConfigured) {
     event.target.value = "";
     setAuthFeedback("Sign in as the owner before importing records.", true);
     return;
@@ -1046,13 +1073,12 @@ async function importCards(event) {
 
       const importedCards = parsed.map(normalizeImportedCard);
       const payload = importedCards.map((card) => toDatabasePayload(card, currentOwner.id));
-      const { error } = await supabase
-        .from(SUPABASE_TABLE)
-        .upsert(payload, { onConflict: "id" });
-
-      if (error) {
-        throw error;
-      }
+      await apiRequest("/cards/import", {
+        method: "POST",
+        body: {
+          cards: payload
+        }
+      });
 
       setAuthFeedback("Archive import complete. Shared records were updated.");
       await loadSharedCards();
@@ -1068,7 +1094,7 @@ async function importCards(event) {
 }
 
 async function loadSampleCards() {
-  if (!currentOwner || !supabase) {
+  if (!currentOwner || !serviceConfigured) {
     setAuthFeedback("Sign in as the owner before publishing sample records.", true);
     return;
   }
@@ -1082,22 +1108,24 @@ async function loadSampleCards() {
   }
 
   const payload = incomingSamples.map((card) => toDatabasePayload(card, currentOwner.id));
-  const { error } = await supabase
-    .from(SUPABASE_TABLE)
-    .insert(payload);
+  try {
+    await apiRequest("/cards/bulk", {
+      method: "POST",
+      body: {
+        cards: payload
+      }
+    });
 
-  if (error) {
+    setAuthFeedback("Sample records published to the shared archive.");
+    await loadSharedCards();
+  } catch (error) {
     console.error("Unable to load sample records", error);
     setAuthFeedback(error.message, true);
-    return;
   }
-
-  setAuthFeedback("Sample records published to the shared archive.");
-  await loadSharedCards();
 }
 
 async function publishLegacyCards() {
-  if (!currentOwner || !supabase || !legacyCards.length) {
+  if (!currentOwner || !serviceConfigured || !legacyCards.length) {
     return;
   }
 
@@ -1118,18 +1146,20 @@ async function publishLegacyCards() {
   }
 
   const payload = cardsToPublish.map((card) => toDatabasePayload(card, currentOwner.id));
-  const { error } = await supabase
-    .from(SUPABASE_TABLE)
-    .insert(payload);
+  try {
+    await apiRequest("/cards/bulk", {
+      method: "POST",
+      body: {
+        cards: payload
+      }
+    });
 
-  if (error) {
+    setAuthFeedback("Browser-local records published to the shared archive.");
+    await loadSharedCards();
+  } catch (error) {
     console.error("Unable to publish browser-local archive", error);
     setAuthFeedback(error.message, true);
-    return;
   }
-
-  setAuthFeedback("Browser-local records published to the shared archive.");
-  await loadSharedCards();
 }
 
 function setAuthFeedback(message, isError = false) {
