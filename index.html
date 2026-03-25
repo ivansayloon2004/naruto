@@ -19,7 +19,7 @@
         </p>
         <p class="owner-badge" id="owner-badge">Public archive online</p>
         <div class="hero-actions" id="owner-toolbar" hidden>
-          <a class="button button-primary" href="#card-form">Add record</a>
+          <a class="button button-primary" href="#card-form">Add card</a>
           <button class="button button-secondary" id="export-button" type="button">Export archive</button>
           <label class="button button-secondary file-button" for="import-file">Import archive</label>
           <input id="import-file" type="file" accept=".json,application/json">
@@ -69,10 +69,16 @@
 
     <main class="layout">
       <section class="panel form-panel">
-        <div class="section-heading">
+        <div class="section-heading" id="guest-heading">
           <p class="eyebrow">Owner Access</p>
           <h2>Manage the public archive</h2>
           <p>Visitors can browse the archive immediately. Sign in with your Supabase owner account to publish or update records.</p>
+        </div>
+
+        <div class="section-heading dashboard-heading" id="dashboard-heading" hidden>
+          <p class="eyebrow">Collection Dashboard</p>
+          <h2>Add cards and manage your archive</h2>
+          <p>Your card entry form appears first below so you can quickly register new cards, then update set totals when needed.</p>
         </div>
 
         <div class="setup-banner" id="setup-banner" hidden>
@@ -111,46 +117,18 @@
           </p>
         </div>
 
-        <p class="auth-feedback" id="auth-feedback" role="status" aria-live="polite"></p>
+        <p class="auth-feedback" id="auth-feedback" role="status" aria-live="polite" hidden></p>
 
-        <div class="owner-session-panel" id="owner-session-panel" hidden>
-          <p class="eyebrow">Owner Session</p>
-          <h3>Dashboard unlocked</h3>
-          <p id="owner-session-copy">You are signed in. Collection management tools are active and the login form is hidden.</p>
+        <div class="dashboard-tools" id="dashboard-tools" hidden>
+          <a class="button button-primary" href="#card-form">Go To Card Entry</a>
+          <a class="button button-secondary" href="#set-target-form">Go To Set Totals</a>
         </div>
 
         <div id="manager-shell" hidden>
           <div class="section-heading manager-heading">
-            <p class="eyebrow">Set Tracker</p>
-            <h2>Maintain set totals</h2>
-            <p>Set the total number of cards in each release so public visitors can see your completion progress.</p>
-          </div>
-
-          <form id="set-target-form" class="set-target-form">
-            <input id="set-target-id" type="hidden">
-
-            <label>
-              Set / Series
-              <input id="set-target-name" name="setName" type="text" placeholder="Tier 4 Wave 2" required>
-            </label>
-
-            <label>
-              Total Cards In Set
-              <input id="set-target-total" name="totalCards" type="number" min="1" placeholder="72" required>
-            </label>
-
-            <div class="form-actions full-width">
-              <button class="button button-primary" type="submit" id="set-target-save-button">Save target</button>
-              <button class="button button-ghost" type="button" id="set-target-reset-button">Clear target form</button>
-            </div>
-          </form>
-
-          <div id="set-target-list" class="set-target-list"></div>
-
-          <div class="section-heading manager-heading">
-            <p class="eyebrow">Collection Record</p>
-            <h2>Register or update a card</h2>
-            <p>Maintain separate records whenever the same artwork exists in different languages or releases.</p>
+            <p class="eyebrow">Card Entry</p>
+            <h2>Add or update a card</h2>
+            <p>This is the main panel for registering new cards in your public archive. Save a card here, then adjust set totals below if needed.</p>
           </div>
 
           <form id="card-form" class="card-form">
@@ -275,6 +253,33 @@
               <button class="button button-ghost" type="button" id="reset-button">Clear form</button>
             </div>
           </form>
+
+          <div class="section-heading manager-heading manager-heading-secondary">
+            <p class="eyebrow">Set Tracker</p>
+            <h2>Maintain set totals</h2>
+            <p>Set the total number of cards in each release so public visitors can see your completion progress.</p>
+          </div>
+
+          <form id="set-target-form" class="set-target-form">
+            <input id="set-target-id" type="hidden">
+
+            <label>
+              Set / Series
+              <input id="set-target-name" name="setName" type="text" placeholder="Tier 4 Wave 2" required>
+            </label>
+
+            <label>
+              Total Cards In Set
+              <input id="set-target-total" name="totalCards" type="number" min="1" placeholder="72" required>
+            </label>
+
+            <div class="form-actions full-width">
+              <button class="button button-primary" type="submit" id="set-target-save-button">Save target</button>
+              <button class="button button-ghost" type="button" id="set-target-reset-button">Clear target form</button>
+            </div>
+          </form>
+
+          <div id="set-target-list" class="set-target-list"></div>
         </div>
       </section>
 

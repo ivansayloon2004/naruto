@@ -501,24 +501,22 @@ h2 {
   line-height: 1.55;
 }
 
-.owner-session-panel {
-  display: grid;
-  gap: 0.55rem;
-  margin-top: 1.25rem;
-  padding: 1.1rem 1rem;
+.dashboard-heading {
+  background: linear-gradient(180deg, rgba(22, 59, 99, 0.05), rgba(22, 59, 99, 0.01));
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, rgba(22, 59, 99, 0.06), rgba(22, 59, 99, 0.02));
+  padding: 1.1rem 1rem;
 }
 
-.owner-session-panel h3 {
-  font-size: 1.35rem;
-}
-
-.owner-session-panel p:not(.eyebrow) {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.6;
+.dashboard-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-muted);
 }
 
 .setup-banner,
@@ -586,6 +584,10 @@ h2 {
 
 .manager-heading {
   padding-top: 0.15rem;
+}
+
+.manager-heading-secondary {
+  margin-top: 0.2rem;
 }
 
 .hero {
@@ -690,6 +692,10 @@ h2 {
 
 .panel {
   padding: 1.65rem;
+}
+
+.form-panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 252, 0.94));
 }
 
 .section-heading {

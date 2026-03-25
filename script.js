@@ -77,6 +77,8 @@ const rarityRank = {
 };
 
 const elements = {
+  guestHeading: document.querySelector("#guest-heading"),
+  dashboardHeading: document.querySelector("#dashboard-heading"),
   authShell: document.querySelector("#auth-shell"),
   authForm: document.querySelector("#auth-form"),
   authOwnerName: document.querySelector("#auth-owner-name"),
@@ -87,8 +89,7 @@ const elements = {
   authNote: document.querySelector("#auth-note"),
   setupBanner: document.querySelector("#setup-banner"),
   publicNote: document.querySelector("#public-note"),
-  ownerSessionPanel: document.querySelector("#owner-session-panel"),
-  ownerSessionCopy: document.querySelector("#owner-session-copy"),
+  dashboardTools: document.querySelector("#dashboard-tools"),
   ownerBadge: document.querySelector("#owner-badge"),
   ownerToolbar: document.querySelector("#owner-toolbar"),
   refreshButton: document.querySelector("#refresh-button"),
@@ -385,23 +386,23 @@ function updateOwnerUI() {
   document.body.classList.toggle("owner-mode", ownerActive);
   document.body.classList.toggle("viewer-mode", !ownerActive);
 
+  elements.guestHeading.hidden = ownerActive;
+  elements.dashboardHeading.hidden = !ownerActive;
   elements.ownerToolbar.hidden = !ownerActive;
+  elements.dashboardTools.hidden = !ownerActive;
   elements.managerShell.hidden = !ownerActive;
   elements.loadSampleButton.hidden = !ownerActive;
   elements.authShell.hidden = ownerActive;
-  elements.ownerSessionPanel.hidden = !ownerActive;
   elements.setupBanner.hidden = Boolean(supabase);
   elements.migrateLocalButton.hidden = !ownerActive || !legacyCards.length;
 
   if (!ownerActive) {
     resetForm();
     resetSetTargetForm();
-    elements.ownerSessionCopy.textContent = "You are signed in. Collection management tools are active and the login form is hidden.";
   } else {
     syncOwnerNameFields(resolveArchiveOwnerName() || currentOwner.ownerName || inferOwnerNameFromEmail(currentOwner.email));
     elements.authForm.reset();
     setAuthFeedback("");
-    elements.ownerSessionCopy.textContent = `Signed in as ${currentOwner.email}. The login form is hidden while you manage your archive, and public visitors can search your owner name to view your collection.`;
   }
 
   render();
@@ -1122,6 +1123,7 @@ async function publishLegacyCards() {
 
 function setAuthFeedback(message, isError = false) {
   elements.authFeedback.textContent = message;
+  elements.authFeedback.hidden = !message;
   elements.authFeedback.classList.toggle("is-error", isError);
 }
 
