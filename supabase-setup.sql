@@ -13,6 +13,7 @@ create table if not exists public.kayou_cards (
   acquisition_date date,
   purchase_price numeric(12, 2),
   estimated_value numeric(12, 2),
+  trade_contact text,
   image_data text,
   notes text,
   owner_user_id uuid not null references auth.users(id) on delete cascade,
@@ -31,6 +32,9 @@ alter table public.kayou_cards
 
 alter table public.kayou_cards
   add column if not exists estimated_value numeric(12, 2);
+
+alter table public.kayou_cards
+  add column if not exists trade_contact text;
 
 update public.kayou_cards
 set card_status = 'Owned'

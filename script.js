@@ -20,6 +20,7 @@ const SAMPLE_CARDS = [
     acquisitionDate: "2026-01-18",
     purchasePrice: 185,
     estimatedValue: 240,
+    tradeContact: "",
     image: "",
     notes: "Sleeved in premium binder. Great foil pop under natural light.",
     createdAt: Date.now() - 300000
@@ -39,6 +40,7 @@ const SAMPLE_CARDS = [
     acquisitionDate: "2026-02-05",
     purchasePrice: 120,
     estimatedValue: 165,
+    tradeContact: "ivansayloon2004@example.com",
     image: "",
     notes: "One for binder, one for trade stock.",
     createdAt: Date.now() - 200000
@@ -58,6 +60,7 @@ const SAMPLE_CARDS = [
     acquisitionDate: "2026-03-02",
     purchasePrice: null,
     estimatedValue: 80,
+    tradeContact: "",
     image: "",
     notes: "Good reference card for future English set tracking.",
     createdAt: Date.now() - 100000
@@ -110,6 +113,7 @@ const elements = {
   date: document.querySelector("#card-date"),
   purchasePrice: document.querySelector("#card-purchase-price"),
   estimatedValue: document.querySelector("#card-estimated-value"),
+  tradeContact: document.querySelector("#card-trade-contact"),
   photoInput: document.querySelector("#card-photo-input"),
   photoPreviewWrap: document.querySelector("#card-photo-preview-wrap"),
   photoPreview: document.querySelector("#card-photo-preview"),
@@ -549,6 +553,7 @@ async function handleSubmit(event) {
     acquisitionDate: elements.date.value,
     purchasePrice: parseOptionalAmount(elements.purchasePrice.value),
     estimatedValue: parseOptionalAmount(elements.estimatedValue.value),
+    tradeContact: elements.tradeContact.value.trim(),
     image: currentCardImage,
     notes: elements.notes.value.trim(),
     createdAt: elements.cardId.value ? findCreatedAt(elements.cardId.value) : Date.now()
@@ -556,6 +561,11 @@ async function handleSubmit(event) {
 
   if (!card.ownerName || !card.title || !card.character || !card.set) {
     setAuthFeedback("Complete the owner name, title, character, and set fields before saving.", true);
+    return;
+  }
+
+  if (normalizeCardStatus(card.status) === "For Trade" && !card.tradeContact) {
+    setAuthFeedback("Add a public trade contact before publishing a trade listing.", true);
     return;
   }
 
@@ -585,10 +595,7 @@ async function handleSubmit(event) {
 }
 
 async function handleGridClick(event) {
-  if (!currentOwner || !supabase) {
-    return;
-  }
-
+  const tradeButton = event.target.closest(".trade-contact-button");
   const editButton = event.target.closest(".edit-button");
   const deleteButton = event.target.closest(".delete-button");
   const cardElement = event.target.closest(".collection-card");
@@ -600,6 +607,15 @@ async function handleGridClick(event) {
   const { id } = cardElement.dataset;
   const card = cards.find((entry) => entry.id === id);
   if (!card) {
+    return;
+  }
+
+  if (tradeButton) {
+    await handleTradeContact(card);
+    return;
+  }
+
+  if (!currentOwner || !supabase) {
     return;
   }
 
@@ -630,6 +646,30 @@ async function handleGridClick(event) {
   }
 }
 
+async function handleTradeContact(card) {
+  if (normalizeCardStatus(card.status) !== "For Trade" || !card.tradeContact) {
+    return;
+  }
+
+  const contactAction = resolveTradeContactAction(card.tradeContact, card.title);
+  if (contactAction.kind === "link") {
+    window.open(contactAction.href, "_blank", "noopener,noreferrer");
+    return;
+  }
+
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(contactAction.value);
+      window.alert("Trade contact copied to your clipboard.");
+      return;
+    } catch (error) {
+      console.error("Unable to copy trade contact", error);
+    }
+  }
+
+  window.prompt("Copy this trade contact:", contactAction.value);
+}
+
 function populateForm(card) {
   elements.cardId.value = card.id;
   elements.ownerName.value = card.ownerName || "";
@@ -645,6 +685,7 @@ function populateForm(card) {
   elements.date.value = card.acquisitionDate || "";
   elements.purchasePrice.value = card.purchasePrice ?? "";
   elements.estimatedValue.value = card.estimatedValue ?? "";
+  elements.tradeContact.value = card.tradeContact || "";
   currentCardImage = card.image || "";
   updatePhotoPreview(currentCardImage, currentCardImage ? "Saved card photo loaded." : "No photo selected.");
   elements.notes.value = card.notes || "";
@@ -662,6 +703,7 @@ function resetForm() {
   elements.copies.value = 1;
   elements.purchasePrice.value = "";
   elements.estimatedValue.value = "";
+  elements.tradeContact.value = "";
   syncOwnerNameFields(resolveArchiveOwnerName() || currentOwner?.ownerName || inferOwnerNameFromEmail(currentOwner?.email));
   clearSelectedPhoto();
   elements.saveButton.textContent = "Save card";
@@ -885,6 +927,8 @@ function renderGrid(source) {
     const statusPill = fragment.querySelector(".status-pill");
     const languagePill = fragment.querySelector(".language-pill");
     const actions = fragment.querySelector(".card-actions");
+    const publicActions = fragment.querySelector(".card-public-actions");
+    const tradeContactButton = fragment.querySelector(".trade-contact-button");
     const detailCopiesLabel = fragment.querySelector(".detail-copies-label");
     const detailPurchaseLabel = fragment.querySelector(".detail-purchase-label");
     const detailEstimateLabel = fragment.querySelector(".detail-estimate-label");
@@ -911,6 +955,12 @@ function renderGrid(source) {
     fragment.querySelector(".detail-estimate").textContent = formatOptionalAmount(card.estimatedValue);
     fragment.querySelector(".card-notes").textContent = card.notes || "";
     image.alt = `${card.title} ${card.language} card`;
+
+    publicActions.hidden = !(normalizeCardStatus(card.status) === "For Trade" && card.tradeContact);
+    if (!publicActions.hidden) {
+      const contactAction = resolveTradeContactAction(card.tradeContact, card.title);
+      tradeContactButton.textContent = contactAction.kind === "link" ? "Contact for trade" : "Copy trade contact";
+    }
 
     if (card.image) {
       image.src = card.image;
@@ -1090,6 +1140,7 @@ function normalizeImportedCard(card) {
     acquisitionDate: String(card.acquisitionDate || card.acquisition_date || ""),
     purchasePrice: parseStoredAmount(card.purchasePrice ?? card.purchase_price),
     estimatedValue: parseStoredAmount(card.estimatedValue ?? card.estimated_value),
+    tradeContact: String(card.tradeContact || card.trade_contact || "").trim(),
     image: String(card.image || card.image_data || "").trim(),
     notes: String(card.notes || "").trim(),
     createdAt: Number(card.createdAt) || Date.now()
@@ -1112,6 +1163,7 @@ function mapRowToCard(row) {
     acquisitionDate: row.acquisition_date || "",
     purchasePrice: parseStoredAmount(row.purchase_price),
     estimatedValue: parseStoredAmount(row.estimated_value),
+    tradeContact: row.trade_contact || "",
     image: row.image_data || "",
     notes: row.notes || "",
     createdAt: row.created_at ? Date.parse(row.created_at) : Date.now()
@@ -1145,6 +1197,7 @@ function toDatabasePayload(card, ownerId) {
     acquisition_date: card.acquisitionDate || null,
     purchase_price: toDatabaseAmount(card.purchasePrice),
     estimated_value: toDatabaseAmount(card.estimatedValue),
+    trade_contact: card.tradeContact || null,
     image_data: card.image || null,
     notes: card.notes || null,
     owner_user_id: ownerId
@@ -1222,6 +1275,31 @@ function parseStoredAmount(value) {
 function toDatabaseAmount(value) {
   const amount = parseStoredAmount(value);
   return amount === null ? null : amount;
+}
+
+function resolveTradeContactAction(contact, cardTitle) {
+  const value = String(contact || "").trim();
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (/^https?:\/\//i.test(value) || /^mailto:/i.test(value)) {
+    return {
+      kind: "link",
+      href: value
+    };
+  }
+
+  if (emailPattern.test(value)) {
+    const subject = encodeURIComponent(`Trade inquiry: ${cardTitle}`);
+    return {
+      kind: "link",
+      href: `mailto:${value}?subject=${subject}`
+    };
+  }
+
+  return {
+    kind: "copy",
+    value
+  };
 }
 
 function archiveKey(card) {
