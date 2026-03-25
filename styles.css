@@ -14,6 +14,12 @@
   --accent-soft: rgba(22, 59, 99, 0.08);
   --accent-soft-strong: rgba(22, 59, 99, 0.14);
   --danger: #b42318;
+  --owned-bg: rgba(5, 96, 58, 0.12);
+  --owned-ink: #05603a;
+  --wishlist-bg: rgba(180, 35, 24, 0.1);
+  --wishlist-ink: #912018;
+  --trade-bg: rgba(117, 96, 26, 0.14);
+  --trade-ink: #6e5605;
   --jp: #8e2d2d;
   --cn: #75601a;
   --en: #25537d;
@@ -650,6 +656,76 @@ h2 {
   margin-top: 1.75rem;
 }
 
+.status-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.status-tab,
+.status-summary-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.45rem;
+  padding: 0.65rem 0.95rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+  color: var(--accent-dark);
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.status-tab {
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.status-tab:hover,
+.status-tab:focus-visible {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+  outline: none;
+}
+
+.status-tab.is-active {
+  border-color: rgba(15, 39, 66, 0.14);
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);
+  color: #f8fbff;
+}
+
+.status-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0.95rem 0 0;
+}
+
+.status-summary-item.owned,
+.status-pill.owned {
+  border-color: rgba(5, 96, 58, 0.14);
+  background: var(--owned-bg);
+  color: var(--owned-ink);
+}
+
+.status-summary-item.wishlist,
+.status-pill.wishlist {
+  border-color: rgba(180, 35, 24, 0.14);
+  background: var(--wishlist-bg);
+  color: var(--wishlist-ink);
+}
+
+.status-summary-item.trade,
+.status-pill.trade {
+  border-color: rgba(117, 96, 26, 0.14);
+  background: var(--trade-bg);
+  color: var(--trade-ink);
+}
+
 .set-progress-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -846,6 +922,7 @@ h2 {
   margin-bottom: 0.65rem;
 }
 
+.status-pill,
 .language-pill,
 .rarity-pill {
   display: inline-flex;
@@ -855,6 +932,10 @@ h2 {
   border-radius: var(--radius-sm);
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+.status-pill {
+  border: 1px solid transparent;
 }
 
 .language-pill {

@@ -1,6 +1,8 @@
 const LEGACY_STORAGE_KEY = "naruto-kayou-card-archive-v1";
 const SUPABASE_TABLE = "kayou_cards";
 const SUPABASE_SET_TABLE = "kayou_set_targets";
+const CARD_STATUSES = ["Owned", "Wishlist", "For Trade"];
+const PHYSICAL_CARD_STATUSES = new Set(["Owned", "For Trade"]);
 
 const SAMPLE_CARDS = [
   {
@@ -11,6 +13,7 @@ const SAMPLE_CARDS = [
     set: "Tier 4 Wave 2",
     number: "MR-001",
     language: "Japanese",
+    status: "Owned",
     rarity: "Secret Rare",
     condition: "Near Mint",
     copies: 1,
@@ -27,6 +30,7 @@ const SAMPLE_CARDS = [
     set: "Tier 3 Wave 5",
     number: "UR-017",
     language: "Chinese",
+    status: "For Trade",
     rarity: "Ultra Rare",
     condition: "Mint",
     copies: 2,
@@ -43,6 +47,7 @@ const SAMPLE_CARDS = [
     set: "English Debut Set",
     number: "SR-009",
     language: "English",
+    status: "Wishlist",
     rarity: "Super Rare",
     condition: "Near Mint",
     copies: 1,
@@ -92,6 +97,7 @@ const elements = {
   set: document.querySelector("#card-set"),
   number: document.querySelector("#card-number"),
   language: document.querySelector("#card-language"),
+  status: document.querySelector("#card-status"),
   rarity: document.querySelector("#card-rarity"),
   condition: document.querySelector("#card-condition"),
   copies: document.querySelector("#card-copies"),
@@ -103,6 +109,7 @@ const elements = {
   photoNote: document.querySelector("#card-photo-note"),
   removePhotoButton: document.querySelector("#remove-photo-button"),
   notes: document.querySelector("#card-notes"),
+  statusTabs: document.querySelector("#status-tabs"),
   search: document.querySelector("#search-input"),
   filterLanguage: document.querySelector("#filter-language"),
   filterRarity: document.querySelector("#filter-rarity"),
@@ -116,6 +123,9 @@ const elements = {
   jpCount: document.querySelector("#jp-count"),
   cnCount: document.querySelector("#cn-count"),
   enCount: document.querySelector("#en-count"),
+  ownedCount: document.querySelector("#owned-count"),
+  wishlistCount: document.querySelector("#wishlist-count"),
+  tradeCount: document.querySelector("#trade-count"),
   resultsCount: document.querySelector("#results-count"),
   saveButton: document.querySelector("#save-button"),
   resetButton: document.querySelector("#reset-button"),
@@ -136,6 +146,7 @@ let setTargets = [];
 let legacyCards = loadLegacyCards();
 let currentOwner = null;
 let currentCardImage = "";
+let selectedStatusFilter = "All";
 
 bindEventListeners();
 updatePhotoPreview("", "No photo selected. On phones, this can open the camera. On desktop, it lets you choose an image file.");
@@ -163,6 +174,7 @@ function bindEventListeners() {
   elements.resetButton.addEventListener("click", resetForm);
   elements.photoInput.addEventListener("change", handlePhotoChange);
   elements.removePhotoButton.addEventListener("click", clearSelectedPhoto);
+  elements.statusTabs.addEventListener("click", handleStatusTabClick);
   elements.search.addEventListener("input", render);
   elements.filterLanguage.addEventListener("change", render);
   elements.filterRarity.addEventListener("change", render);
@@ -175,6 +187,25 @@ function bindEventListeners() {
   elements.grid.addEventListener("click", (event) => {
     void handleGridClick(event);
   });
+}
+
+function handleStatusTabClick(event) {
+  const button = event.target.closest(".status-tab");
+  if (!button) {
+    return;
+  }
+
+  const nextStatus = button.dataset.statusFilter;
+  if (!CARD_STATUSES.includes(nextStatus) && nextStatus !== "All") {
+    return;
+  }
+
+  if (nextStatus === selectedStatusFilter) {
+    return;
+  }
+
+  selectedStatusFilter = nextStatus;
+  render();
 }
 
 async function initializeApp() {
@@ -500,6 +531,7 @@ async function handleSubmit(event) {
     set: elements.set.value.trim(),
     number: elements.number.value.trim(),
     language: elements.language.value,
+    status: elements.status.value,
     rarity: elements.rarity.value,
     condition: elements.condition.value,
     copies: Number(elements.copies.value) || 1,
@@ -593,6 +625,7 @@ function populateForm(card) {
   elements.set.value = card.set;
   elements.number.value = card.number;
   elements.language.value = card.language;
+  elements.status.value = normalizeCardStatus(card.status);
   elements.rarity.value = card.rarity;
   elements.condition.value = card.condition;
   elements.copies.value = card.copies;
@@ -608,6 +641,7 @@ function resetForm() {
   elements.form.reset();
   elements.cardId.value = "";
   elements.language.value = "Japanese";
+  elements.status.value = "Owned";
   elements.rarity.value = "Common";
   elements.condition.value = "Mint";
   elements.copies.value = 1;
@@ -626,14 +660,16 @@ function render() {
   renderStats(cards);
   renderSetProgress();
   renderSetTargetList();
+  updateStatusTabs();
   renderGrid(visibleCards);
-  elements.resultsCount.textContent = `${visibleCards.length} card${visibleCards.length === 1 ? "" : "s"} shown`;
+  elements.resultsCount.textContent = formatResultsSummary(visibleCards.length);
 }
 
 function filterCards(source) {
   const search = elements.search.value.trim().toLowerCase();
   const language = elements.filterLanguage.value;
   const rarity = elements.filterRarity.value;
+  const status = selectedStatusFilter;
 
   return source.filter((card) => {
     const searchTarget = [
@@ -642,6 +678,7 @@ function filterCards(source) {
       card.set,
       card.number,
       card.language,
+      card.status,
       card.rarity,
       card.notes
     ]
@@ -651,8 +688,9 @@ function filterCards(source) {
     const matchesSearch = !search || searchTarget.includes(search);
     const matchesLanguage = language === "All" || card.language === language;
     const matchesRarity = rarity === "All" || card.rarity === rarity;
+    const matchesStatus = status === "All" || normalizeCardStatus(card.status) === status;
 
-    return matchesSearch && matchesLanguage && matchesRarity;
+    return matchesSearch && matchesLanguage && matchesRarity && matchesStatus;
   });
 }
 
@@ -684,24 +722,38 @@ function sortCards(source) {
 }
 
 function renderStats(source) {
+  const physicalCards = source.filter((card) => countsTowardCollection(card.status));
   const languageCounts = {
     Japanese: 0,
     Chinese: 0,
     English: 0
   };
+  const statusCounts = {
+    Owned: 0,
+    Wishlist: 0,
+    "For Trade": 0
+  };
 
   let totalCopies = 0;
 
   source.forEach((card) => {
+    const status = normalizeCardStatus(card.status);
+    statusCounts[status] += 1;
+  });
+
+  physicalCards.forEach((card) => {
     totalCopies += Number(card.copies) || 0;
     languageCounts[normalizeLanguage(card.language)] += 1;
   });
 
-  elements.uniqueCount.textContent = String(source.length);
+  elements.uniqueCount.textContent = String(physicalCards.length);
   elements.copyCount.textContent = String(totalCopies);
   elements.jpCount.textContent = String(languageCounts.Japanese);
   elements.cnCount.textContent = String(languageCounts.Chinese);
   elements.enCount.textContent = String(languageCounts.English);
+  elements.ownedCount.textContent = `Owned ${statusCounts.Owned}`;
+  elements.wishlistCount.textContent = `Wishlist ${statusCounts.Wishlist}`;
+  elements.tradeCount.textContent = `For Trade ${statusCounts["For Trade"]}`;
 }
 
 function renderSetProgress() {
@@ -787,8 +839,8 @@ function renderGrid(source) {
     const emptyState = document.createElement("div");
     emptyState.className = "empty-state";
     emptyState.innerHTML = `
-      <h3>The archive is ready</h3>
-      <p>${supabase ? "No shared records are published yet." : "Configure Supabase or publish records to begin."}</p>
+      <h3>${selectedStatusFilter === "All" ? "The archive is ready" : `No ${selectedStatusFilter} records found`}</h3>
+      <p>${supabase ? emptyStateMessageForStatus() : "Configure Supabase or publish records to begin."}</p>
     `;
     elements.grid.append(emptyState);
     return;
@@ -799,10 +851,14 @@ function renderGrid(source) {
     const article = fragment.querySelector(".collection-card");
     const imageWrap = fragment.querySelector(".card-image-wrap");
     const image = fragment.querySelector(".card-image");
+    const statusPill = fragment.querySelector(".status-pill");
     const languagePill = fragment.querySelector(".language-pill");
     const actions = fragment.querySelector(".card-actions");
+    const detailCopiesLabel = fragment.querySelector(".detail-copies-label");
 
     article.dataset.id = card.id;
+    statusPill.textContent = normalizeCardStatus(card.status);
+    statusPill.classList.add(statusClass(normalizeCardStatus(card.status)));
     languagePill.textContent = card.language;
     languagePill.classList.add(languageClass(card.language));
 
@@ -813,6 +869,7 @@ function renderGrid(source) {
     fragment.querySelector(".detail-number").textContent = card.number || "Unlisted";
     fragment.querySelector(".detail-owner").textContent = card.ownerName || archiveOwnerName;
     fragment.querySelector(".detail-condition").textContent = card.condition || "Unknown";
+    detailCopiesLabel.textContent = normalizeCardStatus(card.status) === "Wishlist" ? "Target" : "Copies";
     fragment.querySelector(".detail-copies").textContent = String(card.copies || 0);
     fragment.querySelector(".detail-date").textContent = formatDate(card.acquisitionDate);
     fragment.querySelector(".card-notes").textContent = card.notes || "";
@@ -989,6 +1046,7 @@ function normalizeImportedCard(card) {
     set: String(card.set || card.set_name || "").trim(),
     number: String(card.number || card.card_number || "").trim(),
     language: normalizeLanguage(card.language),
+    status: normalizeCardStatus(card.status || card.card_status),
     rarity: String(card.rarity || "Common"),
     condition: String(card.condition || "Mint"),
     copies: Number(card.copies) > 0 ? Number(card.copies) : 1,
@@ -1008,6 +1066,7 @@ function mapRowToCard(row) {
     set: row.set_name || "",
     number: row.card_number || "",
     language: normalizeLanguage(row.language),
+    status: normalizeCardStatus(row.card_status),
     rarity: row.rarity || "Common",
     condition: row.condition || "Mint",
     copies: Number(row.copies) || 1,
@@ -1038,6 +1097,7 @@ function toDatabasePayload(card, ownerId) {
     set_name: card.set,
     card_number: card.number || null,
     language: normalizeLanguage(card.language),
+    card_status: normalizeCardStatus(card.status),
     rarity: card.rarity,
     condition: card.condition || null,
     copies: Number(card.copies) || 1,
@@ -1081,8 +1141,21 @@ function normalizeLanguage(language) {
   return "Japanese";
 }
 
+function normalizeCardStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  if (value === "wishlist" || value === "wish list") {
+    return "Wishlist";
+  }
+
+  if (value === "for trade" || value === "for_trade" || value === "fortrade" || value === "trade") {
+    return "For Trade";
+  }
+
+  return "Owned";
+}
+
 function archiveKey(card) {
-  return `${card.title}::${normalizeLanguage(card.language)}::${card.number}::${card.set}`;
+  return `${card.title}::${normalizeLanguage(card.language)}::${normalizeCardStatus(card.status)}::${card.number}::${card.set}`;
 }
 
 function buildSetProgressEntries() {
@@ -1097,7 +1170,9 @@ function buildSetProgressEntries() {
       totalCards: 0
     };
 
-    entry.ownedCards += 1;
+    if (countsTowardCollection(card.status)) {
+      entry.ownedCards += 1;
+    }
     if (!entry.ownerName && card.ownerName) {
       entry.ownerName = card.ownerName;
     }
@@ -1145,6 +1220,46 @@ function buildSetProgressEntries() {
       };
     })
     .sort((left, right) => left.setName.localeCompare(right.setName));
+}
+
+function countsTowardCollection(status) {
+  return PHYSICAL_CARD_STATUSES.has(normalizeCardStatus(status));
+}
+
+function updateStatusTabs() {
+  elements.statusTabs.querySelectorAll(".status-tab").forEach((button) => {
+    const isActive = button.dataset.statusFilter === selectedStatusFilter;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+}
+
+function statusClass(status) {
+  if (status === "Wishlist") {
+    return "wishlist";
+  }
+
+  if (status === "For Trade") {
+    return "trade";
+  }
+
+  return "owned";
+}
+
+function formatResultsSummary(count) {
+  if (selectedStatusFilter === "All") {
+    return `${count} record${count === 1 ? "" : "s"} shown`;
+  }
+
+  return `${count} ${selectedStatusFilter} record${count === 1 ? "" : "s"} shown`;
+}
+
+function emptyStateMessageForStatus() {
+  if (selectedStatusFilter === "All") {
+    return "No shared records are published yet.";
+  }
+
+  return "No records match the selected status tab and filters right now.";
 }
 
 function resolveArchiveOwnerName() {

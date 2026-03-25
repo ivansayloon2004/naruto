@@ -6,6 +6,7 @@ create table if not exists public.kayou_cards (
   set_name text not null,
   card_number text,
   language text not null check (language in ('Japanese', 'Chinese', 'English')),
+  card_status text not null default 'Owned' check (card_status in ('Owned', 'Wishlist', 'For Trade')),
   rarity text not null,
   condition text,
   copies integer not null default 1 check (copies > 0),
@@ -19,6 +20,28 @@ create table if not exists public.kayou_cards (
 
 alter table public.kayou_cards
   add column if not exists owner_name text;
+
+alter table public.kayou_cards
+  add column if not exists card_status text not null default 'Owned';
+
+update public.kayou_cards
+set card_status = 'Owned'
+where card_status is null
+   or card_status not in ('Owned', 'Wishlist', 'For Trade');
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'kayou_cards_card_status_check'
+  ) then
+    alter table public.kayou_cards
+      add constraint kayou_cards_card_status_check
+      check (card_status in ('Owned', 'Wishlist', 'For Trade'));
+  end if;
+end
+$$;
 
 create index if not exists kayou_cards_created_at_idx
   on public.kayou_cards (created_at desc);

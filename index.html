@@ -14,7 +14,8 @@
         <h1>Present your Naruto Kayou collection as a public archive.</h1>
         <p class="hero-text">
           Publish Japanese, Chinese, and English editions in one shared record so visitors can browse the archive
-          while owner-only access remains reserved for collection updates and administration.
+          while owner-only access remains reserved for collection updates and administration. Separate owned cards,
+          wishlist targets, and trade stock in one professional collection hub.
         </p>
         <p class="owner-badge" id="owner-badge">Public archive online</p>
         <div class="hero-actions" id="owner-toolbar" hidden>
@@ -169,6 +170,15 @@
             </label>
 
             <label>
+              Collection Status
+              <select id="card-status" name="status" required>
+                <option value="Owned">Owned</option>
+                <option value="Wishlist">Wishlist</option>
+                <option value="For Trade">For Trade</option>
+              </select>
+            </label>
+
+            <label>
               Rarity
               <select id="card-rarity" name="rarity" required>
                 <option value="Common">Common</option>
@@ -192,7 +202,7 @@
             </label>
 
             <label>
-              Copies Owned
+              Copies / Quantity
               <input id="card-copies" name="copies" type="number" min="1" value="1" required>
             </label>
 
@@ -244,7 +254,20 @@
         <div class="section-heading section-heading-secondary">
           <p class="eyebrow">Archive Search</p>
           <h2>Review and filter your records</h2>
-          <p>Search by title, character, set, card number, language, and rarity across the archive.</p>
+          <p>Switch between owned cards, wishlist targets, and trade records, then search by title, character, set, card number, language, and rarity.</p>
+        </div>
+
+        <div class="status-tabs" id="status-tabs" role="tablist" aria-label="Archive status filters">
+          <button class="status-tab is-active" type="button" role="tab" aria-selected="true" data-status-filter="All">All Records</button>
+          <button class="status-tab" type="button" role="tab" aria-selected="false" data-status-filter="Owned">Owned</button>
+          <button class="status-tab" type="button" role="tab" aria-selected="false" data-status-filter="Wishlist">Wishlist</button>
+          <button class="status-tab" type="button" role="tab" aria-selected="false" data-status-filter="For Trade">For Trade</button>
+        </div>
+
+        <div class="status-summary" aria-live="polite">
+          <span class="status-summary-item owned" id="owned-count">Owned 0</span>
+          <span class="status-summary-item wishlist" id="wishlist-count">Wishlist 0</span>
+          <span class="status-summary-item trade" id="trade-count">For Trade 0</span>
         </div>
 
         <div class="toolbar">
@@ -306,6 +329,7 @@
       </div>
       <div class="card-body">
         <div class="card-topline">
+          <span class="status-pill"></span>
           <span class="language-pill"></span>
           <span class="rarity-pill"></span>
         </div>
@@ -329,7 +353,7 @@
             <dd class="detail-condition"></dd>
           </div>
           <div>
-            <dt>Copies</dt>
+            <dt class="detail-copies-label">Copies</dt>
             <dd class="detail-copies"></dd>
           </div>
           <div>
